@@ -23,7 +23,7 @@ jobs:
       - name: 读版本号
         id: ver
         run: |
-          $v = python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('gui/app.py', encoding='utf-8').read()).group(1))"
+          $v = python gui/version.py
           "ver=$v" >> $env:GITHUB_OUTPUT
       - name: PyInstaller 打包
         run: |
@@ -38,8 +38,7 @@ jobs:
         run: |
           $env:ADB = "$env:ANDROID_HOME\platform-tools\adb.exe"
           $env:ADBUTILS_ADB_PATH = $env:ADB
-          python -c "import subprocess,sys; r=subprocess.run([r'gui\dist\AndroidAdCleaner\AndroidAdCleaner.exe','--cli','run.py','devices'],capture_output=True,text=True,encoding='utf-8',timeout=120); print('rc',r.returncode); print(r.stdout); print(r.stderr[-2000:]); sys.exit(0 if ('没有连着的手机' in r.stdout or 'device' in r.stdout) else 1)"
-          python -c "import subprocess,sys; r=subprocess.run([r'gui\dist\AndroidAdCleaner\AndroidAdCleaner.exe','--cli','run.py','--help'],capture_output=True,text=True,encoding='utf-8',timeout=60); print(r.stdout[:300]); sys.exit(0 if 'run.py' in r.stdout else 1)"
+          python gui/smoke_test.py gui\dist\AndroidAdCleaner\AndroidAdCleaner.exe
       - name: 便携版 zip
         run: Compress-Archive -Path gui/dist/AndroidAdCleaner -DestinationPath "gui/dist/AndroidAdCleaner-${{ steps.ver.outputs.ver }}-windows-portable.zip"
       - name: 安装程序（Inno Setup）
