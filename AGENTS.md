@@ -57,7 +57,7 @@ python3 tool/run.py devices
 | 8 | 问用户 | 列出 `check` 里的广告包和快应用，问要不要关 |
 | 9 | `run.py -s S suspend <包…>`、`run.py -s S quickapp off` | 用户同意后执行 |
 | 10 | `run.py -s S finish` | 收尾。开发者模式开着时会打印提醒 |
-| 11 | 提醒用户关闭开发者模式 | 把 `finish` 打印的提醒转述给用户；用户要你代关，执行 `run.py -s S dev-off --yes`（执行后连接断开，放在最后） |
+| 11 | 提醒用户关闭开发者模式 | 把 `finish` 打印的提醒转述给用户；用户要你代关，执行 `run.py -s S dev-off --yes`（执行后连接断开，放在最后；执行完请用户在手机上核对开发者选项总开关是关的） |
 
 没有机型脚本的机型：
 

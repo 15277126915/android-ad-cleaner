@@ -88,6 +88,7 @@ python3 tool/run.py -s <序列号> chan-scan    # 列营销通知渠道
 python3 tool/run.py -s <序列号> chan-off backups/<型号>-<时间>/channels.tsv
 python3 tool/run.py -s <序列号> quickapp     # 检测快应用；quickapp off 关闭
 python3 tool/run.py -s <序列号> finish       # 收尾，提醒关闭开发者模式
+python3 tool/run.py -s <序列号> dev-off --yes  # 从电脑关闭开发者模式（最后一步，执行后断开）
 ```
 
 <p align="center"><img src="images/channel-off.png" width="420" alt="营销通知渠道关掉后的样子"></p>
