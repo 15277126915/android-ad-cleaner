@@ -1,0 +1,22 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 15
+skinparam backgroundColor #FFFFFF
+skinparam dpi 160
+skinparam rectangle {
+  BackgroundColor #F4F7FB
+  BorderColor #3B6FD8
+  RoundCorner 12
+}
+skinparam ArrowColor #555555
+left to right direction
+title 三种用法
+actor "你" as U
+rectangle "用法一：能执行命令的 AI 智能体\nWorkBuddy / Claude Code / Codex / Trae / Cursor\n\nAI 读 AGENTS.md，替你跑脚本\n需要电脑 + 数据线" as A
+rectangle "用法二：聊天 AI\nDeepSeek / 豆包 / ChatGPT / Kimi / 元宝\n\n复制提示词，AI 一步一步带你点\n只要手机" as B
+rectangle "用法三：手动清单\ndocs/清单/\n\n按图文清单自己关\n只要手机" as C
+U --> A
+U --> B
+U --> C
+@enduml

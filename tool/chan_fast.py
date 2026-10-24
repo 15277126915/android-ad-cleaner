@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""营销通知渠道（通用版，走 fast 引擎）。
+  chan_fast.py -s SERIAL scan             只读：列出开着的、名字像营销的渠道（候选，人工挑）
+  chan_fast.py -s SERIAL verify 清单.tsv   只读：清单里还开着几个
+  chan_fast.py -s SERIAL off 清单.tsv      逐个打开渠道页关掉
+  chan_fast.py -s SERIAL on  清单.tsv      还原
+清单.tsv：包名<TAB>渠道id<TAB>说明，一行一个；# 开头是注释。
+"""
+import re, shlex, sys, time, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from fast import Phone
+
+KW = re.compile(r"营销|活动|推荐|推广|热点|热门|资讯|新闻|福利|优惠|特惠|精选|精彩|运营|促销|红包|直播|种草|内容|头条|猜你|好物|权益|会员|签到|广告|recommend|promo|market|deal|news|topstory|upsell|offer", re.I)
+SKIP = re.compile(r"下载|更新|安装|上传|订单|物流|快递|交易|支付|账号|安全|验证|通话|来电|消息|聊天|私信|评论|互动|提醒|闹钟|日程|天气预警|系统|前台|后台|服务运行|播放|媒体", re.I)
+
+
+def parse(p):
+    txt = p.d.shell("dumpsys notification --noredact", timeout=60).output
+    txt = txt[txt.find("PackagePreferences:"):]
+    cur, app_off, d = None, {}, {}
+    for line in txt.splitlines():
+        m = re.match(r"\s*AppSettings: (\S+)", line)
+        if m:
+            cur = m.group(1); app_off[cur] = "importance=NONE" in line; continue
+        m = re.search(r"NotificationChannel\{mId='(.*?)', mName=(.*?), mDescription=.*?mImportance=(-?\d+).*?mDeleted=(\w+)", line)
+        if m and cur and (cur, m.group(1)) not in d:
+            d[(cur, m.group(1))] = (m.group(2), int(m.group(3)), m.group(4) == "true")
+    return d, app_off
+
+
+def load(path):
+    out = []
+    for line in open(path, encoding="utf-8"):
+        line = line.rstrip("\n")
+        if line.strip() and not line.startswith("#"):
+            pk, cid, label = (line.split("\t") + ["", ""])[:3]
+            out.append((pk, cid, label or cid))
+    return out
+
+
+def state(d, app_off, pk, cid):
+    if (pk, cid) not in d:
+        return "--"
+    name, imp, deleted = d[(pk, cid)]
+    if imp == 0: return "off"
+    if deleted: return "del"
+    if app_off.get(pk): return "app"
+    return "ON"
+
+
+def toggle(p, pk, cid, want_on, name=""):
+    # -f NEW_TASK|CLEAR_TASK：不加的话荣耀/OPPO 会复用上一个渠道页
+    p.d.shell("am start -f 0x10008000 -a android.settings.CHANNEL_NOTIFICATION_SETTINGS"
+              f" --es android.provider.extra.APP_PACKAGE {shlex.quote(pk)}"
+              f" --es android.provider.extra.CHANNEL_ID {shlex.quote(cid)}")
+    sw = None
+    for _ in range(12):
+        tx = [t for t, _, _ in p.texts()]
+        if (not name or name in tx):
+            sw = p.switches()
+            if sw:
+                break
+        time.sleep(0.2)
+    if not sw:
+        return f"页面不是「{name}」或没开关，跳过"
+    for attempt in range(3):                   # 页面动画没完时点击会被吞：点完读回来，没变就再点
+        t, c, xy = sw[0]                       # 渠道页第一个开关=允许通知
+        if c == want_on:
+            return None
+        time.sleep(0.25 + 0.3 * attempt)
+        p.click(*xy); time.sleep(0.4); p.confirm()
+        sw = p.switches() or sw
+    return "点了 3 次没变"
+
+
+
+def main():
+    a = sys.argv[1:]
+    p = Phone(a[1], log=False); cmd = a[2]
+    if cmd == "scan":
+        d, app_off = parse(p)
+        for (pk, cid), (name, imp, deleted) in sorted(d.items()):
+            if imp != 0 and not deleted and not app_off.get(pk) and KW.search(name + " " + cid) and not SKIP.search(name):
+                print(f"{pk}\t{cid}\t{name}")
+        return
+    items = load(a[3])
+    if cmd in ("off", "on"):
+        want = cmd == "on"
+        d, app_off = parse(p)
+        t0 = time.time(); n = 0
+        for pk, cid, label in items:
+            st = state(d, app_off, pk, cid)
+            if st in ("--", "del", "app") or (st == "off") == (not want):
+                continue
+            err = toggle(p, pk, cid, want, d[(pk, cid)][0])
+            n += 1
+            print(f"  {'✗ '+err if err else ('开' if want else '关')}  {label}")
+        p.d.shell("input keyevent HOME")   # 别走 u2 的 press：连接断过一次
+        print(f"拨了 {n} 个，{time.time()-t0:.0f} 秒")
+    d, app_off = parse(p)
+    bad = 0
+    for pk, cid, label in items:
+        st = state(d, app_off, pk, cid)
+        if st == "ON": bad += 1
+        if cmd == "verify":
+            print(f"{st:4} {label}")
+    print(f"营销渠道仍开着: {bad} 个")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,122 @@
+# 手机去广告
+
+关掉国产安卓手机系统里的广告、热搜、资讯推荐和营销推送。
+
+- 不 root，不解锁，不刷机，系统更新不受影响。
+- 只拨系统和 App 自带的开关。挂起广告包这一步要机主点头，一条命令可以还原。
+- 搜索、负一屏卡片、应用商店的安装和更新、天气预警、快递提醒，这些功能保留。
+
+<p align="center"><img src="images/store-before.png" width="560" alt="改之前：软件商店首页满屏推荐"></p>
+<p align="center">改之前：OPPO 软件商店首页。轮播图、必备、必玩、福利标签，全是推广位。</p>
+
+---
+
+## 处理哪些东西
+
+| 类别 | 例子 | 怎么处理 |
+|---|---|---|
+| 系统广告 | 个性化广告、广告跟踪（OAID）、智能推荐服务 | 系统设置里的开关 |
+| 热搜和资讯 | 下拉搜索的热榜、负一屏资讯、浏览器信息流 | 各 App 设置里的开关，浏览器切到简洁首页 |
+| 推广位 | 商店的轮播、开屏、悬浮活动、签到福利 | 商店「服务管理」里的开关 |
+| 营销推送 | 各 App 的「内容与营销」「活动优惠」通知 | 按渠道关，同一个 App 的订单、快递、更新通知保留 |
+| 广告组件 | `com.opos.ads`、`com.miui.systemAdSolution` 等 | `pm suspend` 挂起，要机主同意 |
+
+## 不做的事
+
+- 不卸载、不停用系统应用（`pm uninstall`、`pm disable-user` 都不用）。
+- 不改 system 分区，不装模块。
+- 不替你同意任何 App 的用户协议。遇到协议页，点「取消」或「以后再说」。
+- 不截账号页和手机号页。
+
+---
+
+## 三种用法
+
+<p align="center"><img src="images/ways.png" width="460" alt="三种用法"></p>
+
+| 用法 | 适合谁 | 要准备什么 | 文档 |
+|---|---|---|---|
+| **一：AI 智能体替你跑** | 有电脑，想省事 | 电脑、数据线、一个能执行命令的 AI 工具 | [docs/02-用AI智能体.md](docs/02-用AI智能体.md) |
+| **二：聊天 AI 带你点** | 只有手机 | DeepSeek、豆包、ChatGPT 任意一个 | [docs/03-用聊天AI.md](docs/03-用聊天AI.md) |
+| **三：照清单手动关** | 想自己掌握每一步 | 只要手机 | [docs/清单/](docs/清单/) |
+
+用法一的开场白，复制给 AI：
+
+```text
+请克隆 https://github.com/{{REPO}} ，读仓库里的 AGENTS.md，
+然后帮我给连着电脑的这台手机去广告。每一步改之前告诉我要改什么。
+```
+
+---
+
+## 实测过的机型
+
+| 品牌 | 机型（型号） | 系统 | 一键菜谱 | 手动清单 | 营销通知 |
+|---|---|---|---|---|---|
+| 荣耀 | PNM-AN10 | MagicOS 10 | ✅ 实测通过，重跑 4 分钟 | ✅ | ✅ 26 个渠道 |
+| OPPO | Find N6（PLP120） | ColorOS 16.0.9 | ⚠️ 路径实测，整段待验证 | ✅ | ✅ 30 个渠道 |
+| OPPO | Find X10 Pro Max（PMX110） | ColorOS 17 | — | ✅ | ✅ |
+| OPPO | Find X9 Ultra（PMA120） | ColorOS 16.0.10 | ❌ 页面和 N6 不同，待补 | 部分 | ✅ 27 个渠道 |
+| OPPO | Find N3 典藏版（PHN110） | ColorOS 16.0.5 | ❌ 待补 | 部分 | ✅ 27 个渠道 |
+| 小米 | 18 Pro Max（M154FF） | HyperOS 4 | ⚠️ 路径实测，整段待验证 | ✅ | ✅ |
+| vivo | X300 Ultra（V2547DA） | OriginOS 6 | — | ✅ | ✅ |
+
+- 营销通知和广告跟踪两项是通用的，任何安卓手机都能跑。
+- 同一个品牌，系统小版本不同，设置页的名字和层级也会变。菜谱按型号和系统版本存放，版本对不上时引擎会提示，找不到入口的步骤会跳过，不会乱点。
+- 你的机型不在表里：照 [docs/04-给新机型做菜谱.md](docs/04-给新机型做菜谱.md) 做一份，欢迎提 PR。
+
+---
+
+## 一次完整的流程
+
+<p align="center"><img src="images/flow.png" width="340" alt="处理流程"></p>
+
+命令写法：
+
+```bash
+pip3 install -r requirements.txt
+python3 tool/run.py devices                 # 看序列号、型号、有没有菜谱
+python3 tool/run.py -s <序列号> check        # 只读检查
+python3 tool/run.py -s <序列号> backup       # 改动前快照
+python3 tool/run.py -s <序列号> recipe       # 跑菜谱
+python3 tool/run.py -s <序列号> chan-scan    # 列营销通知渠道
+python3 tool/run.py -s <序列号> chan-off backups/<型号>-<时间>/channels.tsv
+python3 tool/run.py -s <序列号> finish       # 收尾
+```
+
+<p align="center"><img src="images/channel-off.png" width="420" alt="营销通知渠道关掉后的样子"></p>
+<p align="center">营销通知按渠道关：天气的「内容与营销」关掉，天气预警保留。</p>
+
+---
+
+## 仓库结构
+
+```text
+AGENTS.md            给 AI 智能体读的操作规范
+docs/
+  01-准备工作.md      装 adb、打开 USB 调试
+  02-用AI智能体.md    WorkBuddy、Claude Code、Codex、Trae、Cursor
+  03-用聊天AI.md      DeepSeek、豆包、ChatGPT
+  04-给新机型做菜谱.md
+  05-还原.md
+  06-常见问题.md
+  清单/               各品牌的手动清单
+prompts/             复制给聊天 AI 的提示词
+tool/
+  run.py             总入口
+  fast.py            读屏、找入口、拨开关的引擎（uiautomator2）
+  chan_fast.py       营销通知渠道
+  explore.py         新机型探路（实验）
+recipes/<品牌>-<型号>/recipe.py   各机型菜谱
+images/              文档配图
+```
+
+## 还原
+
+见 [docs/05-还原.md](docs/05-还原.md)。挂起的包和通知渠道各一条命令；App 内的开关按清单路径手动打开。
+
+## 声明
+
+本项目只调用 Android 系统和厂商 App 公开提供的设置项。各厂商的界面随系统更新变化，使用前请备份，结果以你的手机为准。使用本项目造成的任何问题由使用者自行承担。
+
+许可证：MIT
