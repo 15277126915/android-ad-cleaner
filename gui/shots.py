@@ -48,8 +48,17 @@ def run(w):
     shot("gui-5-choose-more")
     # 执行页和完成页：只跑「快照 + 收尾」，不改手机设置
     w.evaluate_js(f"api.start('{SERIAL}', {{backup: true, model: S.status.info.model, steps: [], channels: [], quickapp: false, ads: []}}).then(() => {{ S.logNext = 0; showRun(); }})")
-    wait_js(w, "S.step === 4 && document.querySelector('#log') && document.querySelector('#log').textContent.length > 20", 30)
+    wait_js(w, "S.step === 5", 120)
+    # 执行太快，截不到进行中的页面：用这次的真实日志重新显示执行页（停在第 2 步）
+    w.evaluate_js("""(async () => { const r = await api.poll(0); const done = r; showRun(); clearInterval(pollJob);
+      const lines = r.lines.filter(l => l.trim()).slice(0, 3);
+      document.querySelector('#log').textContent = lines.join('\\n') + '\\n';
+      document.querySelector('#jt').textContent = '第 2 / 2 步：收尾';
+      document.querySelector('#js').textContent = '已用 1 秒';
+      document.querySelector('#jb').style.width = '75%'; window._done = done; })()""")
+    time.sleep(1.5)
     shot("gui-6-run")
+    w.evaluate_js("showDone(window._done)")
     wait_js(w, "S.step === 5", 120)
     shot("gui-7-done")
     w.evaluate_js("openFeedback('bug').then(() => { document.querySelector('#fbtext').value = '执行到「关闭营销通知」时卡住了'; document.querySelector('details:has(#fbdiagtext)').open = true; })")

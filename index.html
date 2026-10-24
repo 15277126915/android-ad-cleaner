@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安卓去广告</title>
+<meta name="description" content="关掉国产安卓手机系统里的广告、热搜、资讯推荐和营销推送。不 root，不刷机，每一项都能还原。Mac 与 Windows 桌面客户端。">
+<link rel="icon" href="gui/icon-1024.png">
+<style>
+:root{
+  --bg:#ffffff; --bg2:#f5f6f8; --card:#ffffff; --text:#16181d; --sub:#5f6672; --line:#e4e7ec;
+  --accent:#2f6fec; --accent2:#1f56c9; --accent-weak:#eaf1fe; --ok:#1f9d55; --warn:#b86e00; --warn-weak:#fdf4e3;
+  --shadow:0 10px 30px rgba(20,30,60,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111317; --bg2:#171a1f; --card:#1c1f25; --text:#eceef2; --sub:#a0a6b0; --line:#2b3038;
+    --accent:#5b8ff9; --accent2:#7aa5ff; --accent-weak:#1d2a44; --ok:#45c47b; --warn:#e2a443; --warn-weak:#33280f;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:22px;height:58px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--text)}
+.logo img{width:28px;height:28px}
+nav .links{margin-left:auto;display:flex;gap:20px;font-size:14px}
+nav .links a{color:var(--sub)}
+@media (max-width:640px){nav .links a:not(.gh){display:none}}
+
+.hero{padding:72px 0 40px;text-align:center}
+.hero h1{font-size:clamp(34px,6vw,56px);line-height:1.15;margin:0 0 18px;letter-spacing:-.5px}
+.hero p.lead{font-size:clamp(17px,2.2vw,20px);color:var(--sub);max-width:640px;margin:0 auto 30px}
+.pills{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:34px}
+.pill{border:1px solid var(--line);border-radius:99px;padding:5px 14px;font-size:14px;color:var(--sub);background:var(--bg2)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:12px 22px;font-weight:600;font-size:16px;border:1px solid transparent;cursor:pointer}
+.btn:hover{text-decoration:none}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent2)}
+.btn.ghost{background:var(--accent-weak);color:var(--accent)}
+.btn.line{border-color:var(--line);color:var(--text);background:var(--card)}
+.btn small{font-weight:500;opacity:.8;font-size:13px}
+.hint{color:var(--sub);font-size:14px;margin-top:14px}
+.shot{margin:46px auto 0;max-width:960px;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line)}
+.shot img{display:block;width:100%}
+
+section{padding:76px 0}
+section.alt{background:var(--bg2)}
+h2{font-size:clamp(26px,3.6vw,34px);margin:0 0 10px;letter-spacing:-.3px}
+.sec-lead{color:var(--sub);margin:0 0 34px;max-width:720px}
+
+.dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:16px}
+.dl{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:12px;position:relative}
+.dl.rec{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.dl .tag{position:absolute;top:-11px;left:18px;background:var(--accent);color:#fff;font-size:12px;font-weight:700;border-radius:99px;padding:2px 10px;display:none}
+.dl.rec .tag{display:block}
+.dl h3{margin:0;font-size:18px}
+.dl .meta{color:var(--sub);font-size:14px;margin:-6px 0 4px}
+.dl .btn{justify-content:center;padding:10px 14px;font-size:15px}
+.dl .note{font-size:13px;color:var(--sub)}
+.baidu{margin-top:22px;border-radius:14px;padding:16px 18px;background:var(--warn-weak);color:var(--warn);font-size:15px}
+.baidu b{color:var(--text)}
+.baidu code{background:var(--card);padding:1px 8px;border-radius:6px;font-size:15px;color:var(--text)}
+details.sum{margin-top:16px;color:var(--sub);font-size:13px}
+details.sum code{font-size:12px;word-break:break-all}
+
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:16px}
+.f{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+.f .ico{font-size:26px}
+.f h3{margin:8px 0 6px;font-size:17px}
+.f p{margin:0;color:var(--sub);font-size:15px}
+
+.steps{display:grid;gap:46px}
+.step{display:grid;grid-template-columns:1fr 1.5fr;gap:34px;align-items:center}
+.step:nth-child(even) .txt{order:2}
+@media (max-width:760px){.step{grid-template-columns:1fr}.step:nth-child(even) .txt{order:0}}
+.step .num{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;margin-bottom:10px}
+.step h3{margin:0 0 8px;font-size:22px}
+.step p{margin:0;color:var(--sub)}
+.step img{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:var(--shadow);display:block}
+
+.promise{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:14px}
+.pr{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.pr .ck{color:var(--ok);font-weight:800;font-size:18px;line-height:1.4}
+.pr b{display:block}
+.pr span{color:var(--sub);font-size:14px}
+
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:15px}
+th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--bg2);font-weight:600;font-size:14px;color:var(--sub)}
+tr:last-child td{border-bottom:0}
+.tbl{overflow-x:auto}
+.y{color:var(--ok);font-weight:600}.m{color:var(--warn);font-weight:600}
+
+.faq details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:10px}
+.faq summary{cursor:pointer;font-weight:600}
+.faq p{margin:10px 0 0;color:var(--sub)}
+
+footer{padding:40px 0 60px;color:var(--sub);font-size:14px;border-top:1px solid var(--line)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="logo" href="#"><img src="gui/icon-1024.png" alt="">安卓去广告</a>
+  <div class="links">
+    <a href="#download">下载</a><a href="#features">能关什么</a><a href="#how">怎么用</a><a href="#devices">支持机型</a><a href="#faq">常见问题</a>
+    <a class="gh" href="https://github.com/rddmwmddr/android-ad-cleaner">GitHub</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <h1>把手机里的广告<br>关掉</h1>
+  <p class="lead">国产安卓手机的开屏广告、热搜、资讯推荐、营销推送，插上数据线，在电脑上点几下关掉。</p>
+  <div class="pills">
+    <span class="pill">不 root · 不刷机</span><span class="pill">系统更新不受影响</span><span class="pill">每一项都能还原</span><span class="pill">开源免费</span>
+  </div>
+  <div class="cta">
+    <a class="btn primary" id="hero-cn" href="#download">国内下载 <small id="hero-os"></small></a>
+    <a class="btn line" id="hero-gh" href="#download">GitHub 下载</a>
+  </div>
+  <div class="hint">版本 <span class="ver"></span> · Mac（Apple / Intel 芯片）· Windows 10 / 11 · 不需要 Python，也不需要 AI 工具</div>
+  <div class="shot"><img src="images/gui-3-detect.png" alt="客户端：检测页" loading="lazy"></div>
+</div></header>
+
+<section id="download" class="alt"><div class="wrap">
+  <h2>下载</h2>
+  <p class="sec-lead">选你的电脑。每个版本都有国内下载（百度网盘）和 GitHub 下载两个地址，文件一样。</p>
+  <div class="dl-grid" id="dl-grid"></div>
+  <div class="baidu" id="baidu-box"></div>
+  <details class="sum"><summary>SHA-256 校验值</summary><div id="sums"></div></details>
+</div></section>
+
+<section id="features"><div class="wrap">
+  <h2>能关掉什么</h2>
+  <p class="sec-lead">只拨系统和 App 自带的开关。搜索、负一屏卡片、应用商店的安装和更新、天气预警、快递提醒，这些功能保留。</p>
+  <div class="feat">
+    <div class="f"><div class="ico">📢</div><h3>系统广告</h3><p>个性化广告、广告跟踪（OAID）、智能推荐服务。</p></div>
+    <div class="f"><div class="ico">🔥</div><h3>热搜和资讯</h3><p>下拉搜索的热榜、负一屏资讯、浏览器信息流。</p></div>
+    <div class="f"><div class="ico">🛍️</div><h3>推广位</h3><p>应用商店的轮播、开屏、悬浮活动、签到福利。</p></div>
+    <div class="f"><div class="ico">🔔</div><h3>营销推送</h3><p>各 App 的「内容与营销」「活动优惠」通知。订单、物流、聊天通知保留。</p></div>
+    <div class="f"><div class="ico">⚡</div><h3>快应用</h3><p>广告一点就跳进去的免安装小程序。关闭后跳转会被系统拦下。</p></div>
+    <div class="f"><div class="ico">🧩</div><h3>广告组件</h3><p>OPPO 广告服务、小米系统广告组件等，挂起后可一键恢复。</p></div>
+  </div>
+</div></section>
+
+<section id="how" class="alt"><div class="wrap">
+  <h2>怎么用</h2>
+  <p class="sec-lead">有现成机型脚本的手机，从插线到做完 4 到 6 分钟。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><div class="num">1</div><h3>连接手机</h3><p>手机打开开发者模式和 USB 调试，用数据线连电脑。客户端里有分步图文教程，五个品牌的入口都写了。</p></div><img src="images/gui-1-connect.png" alt="连接手机" loading="lazy"></div>
+    <div class="step"><div class="txt"><div class="num">2</div><h3>检测</h3><p>读出型号、系统版本、有没有机型脚本、快应用和广告组件的状态。只读，不改东西。</p></div><img src="images/gui-3-detect.png" alt="检测" loading="lazy"></div>
+    <div class="step"><div class="txt"><div class="num">3</div><h3>选择要关的</h3><p>营销通知按渠道列出来，服务类渠道默认不勾。快应用和广告组件由你决定，不勾不动。</p></div><img src="images/gui-4-choose.png" alt="选择要关的" loading="lazy"></div>
+    <div class="step"><div class="txt"><div class="num">4</div><h3>执行</h3><p>开始前存一份改动前的快照。执行期间显示进度和实时日志，手机放着别碰。</p></div><img src="images/gui-6-run.png" alt="执行" loading="lazy"></div>
+    <div class="step"><div class="txt"><div class="num">5</div><h3>完成，关闭开发者模式</h3><p>列出每一步的结果。最后一键关闭开发者模式，关掉不会撤销这次的改动。想恢复，左下角「还原改动」。</p></div><img src="images/gui-7-done.png" alt="完成" loading="lazy"></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>不做的事</h2>
+  <p class="sec-lead">全部代码公开在 GitHub，可以逐行检查。</p>
+  <div class="promise">
+    <div class="pr"><span class="ck">✓</span><div><b>不 root、不解锁、不刷机</b><span>系统更新照收，保修不受影响</span></div></div>
+    <div class="pr"><span class="ck">✓</span><div><b>不卸载、不停用系统应用</b><span>只用「挂起」，一条命令恢复</span></div></div>
+    <div class="pr"><span class="ck">✓</span><div><b>不替你同意任何协议</b><span>遇到协议页点「取消」「以后再说」</span></div></div>
+    <div class="pr"><span class="ck">✓</span><div><b>不上传任何数据</b><span>全程只在你的电脑和手机之间进行</span></div></div>
+  </div>
+</div></section>
+
+<section id="devices" class="alt"><div class="wrap">
+  <h2>支持机型</h2>
+  <p class="sec-lead">营销通知、快应用、广告组件三项所有安卓手机通用。「各 App 里的广告开关」要有对应机型的脚本，没有的机型可以照手动清单做。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>品牌</th><th>实测机型</th><th>系统</th><th>机型脚本（自动关 App 开关）</th></tr></thead>
+    <tbody>
+      <tr><td>荣耀</td><td>PNM-AN10</td><td>MagicOS 10</td><td class="y">有，重跑 4 分钟</td></tr>
+      <tr><td>OPPO</td><td>Find N6</td><td>ColorOS 16.0.9</td><td class="m">有，整段待验证</td></tr>
+      <tr><td>OPPO</td><td>Find X10 Pro Max · Find X9 Ultra · Find N3 典藏版</td><td>ColorOS 16 / 17</td><td>手动清单</td></tr>
+      <tr><td>小米</td><td>Xiaomi 18 Pro Max</td><td>HyperOS 4</td><td class="m">有，整段待验证</td></tr>
+      <tr><td>vivo</td><td>X300 Ultra</td><td>OriginOS 6</td><td>手动清单</td></tr>
+    </tbody>
+  </table></div>
+  <p class="hint" style="text-align:left">你的手机不在表里：客户端里点「反馈问题」→「适配新机型」。</p>
+</div></section>
+
+<section id="faq"><div class="wrap faq">
+  <h2>常见问题</h2>
+  <details><summary>Mac 怎么看是哪种芯片？</summary><p>点屏幕左上角的苹果图标 → 关于本机。「芯片」一栏写 Apple M 开头的是 Apple 芯片，写 Intel 的是 Intel 芯片。</p></details>
+  <details><summary>Windows 弹出「Windows 已保护你的电脑」</summary><p>安装程序没有代码签名。点「更多信息」→「仍要运行」。</p></details>
+  <details><summary>Windows 提示缺少 WebView2</summary><p>点「确定」打开微软官网，下载安装「Evergreen Bootstrapper」，再打开本程序。Windows 11 自带，部分 Windows 10 要装。</p></details>
+  <details><summary>插上手机，客户端认不出来</summary><p>先检查三件事：换一根能传数据的线；手机通知栏里 USB 用途选「传输文件」；手机弹窗点「允许 USB 调试」。Windows 还要装手机品牌的 USB 驱动，各品牌的「手机助手」里带驱动。</p></details>
+  <details><summary>会影响系统更新和保修吗？</summary><p>不会。不 root，不解锁，不改系统分区。用到的是开发者选项和系统自带的设置项。</p></details>
+  <details><summary>关完还会有广告吗？</summary><p>会剩一些：浏览器搜索框的轮播热词没有开关；OPPO 软件商店的「开机必备」弹窗关不掉；新装的 App 默认打开广告跟踪和营销通知，装新 App 后再跑一次。</p></details>
+  <details><summary>怎么恢复？</summary><p>客户端左下角「还原改动」：恢复快应用、恢复挂起的广告组件、重新打开关掉的营销通知。App 内的开关按清单路径手动打开。</p></details>
+</div></section>
+
+<footer><div class="wrap">
+  <div>安卓去广告 · MIT 开源</div>
+  <div><a href="https://github.com/rddmwmddr/android-ad-cleaner">源代码</a> · <a href="https://github.com/rddmwmddr/android-ad-cleaner/tree/main/docs/%E6%B8%85%E5%8D%95">手动清单</a> · <a href="https://github.com/rddmwmddr/android-ad-cleaner/issues/new/choose">反馈问题</a> · <a href="https://github.com/rddmwmddr/android-ad-cleaner/releases">全部版本</a></div>
+</div></footer>
+
+<script>
+/* ===== 发布信息：发新版或填网盘链接时只改这里 ===== */
+const REL = {
+  version: "0.2.0",
+  github: "https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.0/",
+  baidu: { url: "", code: "" },      // 百度网盘分享链接和提取码，填好后网页自动显示
+  files: [
+    { id: "mac-arm64", title: "Mac · Apple 芯片", sub: "M1 / M2 / M3 / M4 及以后", file: "AndroidAdCleaner-0.2.0-mac-arm64.dmg", size: "34 MB",
+      note: "已签名并通过苹果公证，双击就能打开", sha: "2735eb7cbb9e99b6b7f3453b6f5b89259be10102fe6d4a2af053a8b151037343" },
+    { id: "mac-intel", title: "Mac · Intel 芯片", sub: "2020 年及以前的 Intel Mac", file: "AndroidAdCleaner-0.2.0-mac-intel.dmg", size: "39 MB",
+      note: "已签名并通过苹果公证", sha: "be8e9dbd12b87f62370db1f471e3666840ec5c51185438c4773235ab28f2c52a" },
+    { id: "win-setup", title: "Windows · 安装版", sub: "Windows 10 / 11（64 位）", file: "AndroidAdCleaner-0.2.0-windows-setup.exe", size: "29 MB",
+      note: "弹出安全提示时点「更多信息」→「仍要运行」", sha: "f6f5b8091aa683146e5c567e6143cd18b33e4a51c32a3657cc486660dbdd4947" },
+    { id: "win-zip", title: "Windows · 免安装", sub: "Windows 10 / 11（64 位）", file: "AndroidAdCleaner-0.2.0-windows-portable.zip", size: "43 MB",
+      note: "解压后双击 AndroidAdCleaner.exe", sha: "80c9f2212fbf2368a64482fa2bdb04b7be3e193cb3e86f853c4cf8de78a3a07f" },
+  ],
+};
+/* ================================================ */
+
+const hasBaidu = !!REL.baidu.url;
+document.querySelectorAll(".ver").forEach(e => e.textContent = REL.version);
+
+function guessOS(){
+  const ua = navigator.userAgent, p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  if (/Win/i.test(p) || /Windows/i.test(ua)) return "win-setup";
+  if (/Mac/i.test(p) || /Mac OS X/i.test(ua)){
+    try {                                   // Apple 芯片的 Safari / Chrome 会报告 Apple GPU
+      const gl = document.createElement("canvas").getContext("webgl");
+      const r = gl && gl.getExtension("WEBGL_debug_renderer_info");
+      const gpu = r ? gl.getParameter(r.UNMASKED_RENDERER_WEBGL) : "";
+      if (/Intel/i.test(gpu)) return "mac-intel";
+    } catch(e) {}
+    return "mac-arm64";
+  }
+  return null;
+}
+const rec = guessOS();
+
+document.getElementById("dl-grid").innerHTML = REL.files.map(f => `
+  <div class="dl ${f.id === rec ? "rec" : ""}">
+    <span class="tag">推荐你的电脑</span>
+    <h3>${f.title}</h3>
+    <div class="meta">${f.sub} · ${f.size}</div>
+    <a class="btn primary" href="${hasBaidu ? REL.baidu.url : "#baidu-box"}" ${hasBaidu ? 'target="_blank" rel="noopener"' : ""}>国内下载（百度网盘）</a>
+    <a class="btn line" href="${REL.github + f.file}">GitHub 下载</a>
+    <div class="note">${f.note}</div>
+  </div>`).join("");
+
+document.getElementById("baidu-box").innerHTML = hasBaidu
+  ? `百度网盘：<a href="${REL.baidu.url}" target="_blank" rel="noopener">${REL.baidu.url}</a>　提取码 <code>${REL.baidu.code}</code><br>网盘里是同一个文件夹，按上面的文件名找对应的版本，文件夹里附了安装说明。`
+  : `国内下载（百度网盘）整理中，暂时请用 GitHub 下载。`;
+
+const r = REL.files.find(f => f.id === rec);
+if (r){
+  document.getElementById("hero-os").textContent = "· " + r.title;
+  document.getElementById("hero-gh").href = REL.github + r.file;
+  document.getElementById("hero-cn").href = hasBaidu ? REL.baidu.url : "#download";
+  if (hasBaidu) document.getElementById("hero-cn").target = "_blank";
+}
+const sums = REL.files.filter(f => f.sha);
+document.getElementById("sums").innerHTML = sums.length
+  ? sums.map(f => `<div>${f.file}<br><code>${f.sha}</code></div>`).join("<br>")
+  : "见网盘文件夹里的「SHA256校验.txt」或 GitHub Releases 页面。";
+</script>
+</body>
+</html>

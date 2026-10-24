@@ -218,7 +218,7 @@ def main():
         st = "\n".join(f"## {n}\n" + sh(s, f"settings list {n}") for n in ("system", "secure", "global"))
         open(os.path.join(d, "settings-before.txt"), "w", encoding="utf-8").write(st)
         open(os.path.join(d, "stay_on.txt"), "w", encoding="utf-8").write(sh(s, "settings get global stay_on_while_plugged_in"))
-        print(f"快照已存：{d if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
+        print(f"快照已存：{d.replace(os.path.expanduser('~'), '~') if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
 
     elif cmd == "recipe":
         r = recipe_for(info(s)["model"])
