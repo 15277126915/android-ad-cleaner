@@ -27,7 +27,7 @@ jobs:
           "ver=$v" >> $env:GITHUB_OUTPUT
       - name: PyInstaller 打包
         run: |
-          pyinstaller --noconfirm --windowed --name AndroidAdCleaner --icon gui/icon.ico `
+          pyinstaller --noconfirm --windowed --name AndroidAdCleaner --icon "$PWD/gui/icon.ico" `
             --distpath gui/dist --workpath gui/build --specpath gui/build `
             --add-data "$PWD/tool;tool" --add-data "$PWD/recipes;recipes" `
             --add-data "$PWD/images;images" --add-data "$PWD/gui/web;gui/web" `
