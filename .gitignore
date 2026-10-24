@@ -6,3 +6,4 @@ __pycache__/
 gui/.venv/
 gui/build/
 gui/dist/
+gui/ChineseSimplified.isl

@@ -23,7 +23,11 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesInstallIn64BitMode=x64compatible
 
 [Languages]
-Name: "zh"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+#if FileExists(AddBackslash(SourcePath) + "ChineseSimplified.isl")
+Name: "zh"; MessagesFile: "ChineseSimplified.isl"
+#else
+Name: "en"; MessagesFile: "compiler:Default.isl"
+#endif
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"

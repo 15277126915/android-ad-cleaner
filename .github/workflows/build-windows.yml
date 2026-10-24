@@ -36,6 +36,7 @@ jobs:
         run: Compress-Archive -Path gui/dist/AndroidAdCleaner -DestinationPath "gui/dist/AndroidAdCleaner-${{ steps.ver.outputs.ver }}-windows-portable.zip"
       - name: 安装程序（Inno Setup）
         run: |
+          try { Invoke-WebRequest "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl" -OutFile gui/ChineseSimplified.isl } catch { Write-Host "中文语言包下载失败，安装界面用英文" }
           if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
           $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
           if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
