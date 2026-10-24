@@ -10,7 +10,11 @@
   python3 tool/run.py -s 序列号 chan-on  清单.tsv   还原
   python3 tool/run.py -s 序列号 suspend 包名 …       挂起广告包（先征得机主同意），记录到 backups/.../suspended.txt
   python3 tool/run.py -s 序列号 unsuspend [包名 …]   解除挂起（不给包名=解除记录里的全部）
-  python3 tool/run.py -s 序列号 finish             收尾：插电常亮改回备份时的值
+  python3 tool/run.py -s 序列号 quickapp          只读：检测快应用组件（装没装、挂没挂、在不在跑、用没用过）
+  python3 tool/run.py -s 序列号 quickapp off      关闭快应用：挂起全部快应用组件（先征得机主同意）
+  python3 tool/run.py -s 序列号 quickapp on       恢复快应用
+  python3 tool/run.py -s 序列号 finish             收尾：插电常亮改回备份时的值，提醒关闭开发者模式
+  python3 tool/run.py -s 序列号 dev-off --yes      从电脑上关闭开发者模式和 USB 调试（执行后电脑与手机断开）
 """
 import datetime, glob, os, re, shutil, subprocess, sys
 
@@ -18,16 +22,31 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tool")
 BACKUPS = os.path.join(ROOT, "backups")
 
-# 各品牌常见的系统广告包。只在机主同意后挂起；挂起可一条命令还原。
+# 各品牌常见的系统广告包（快应用另列在 QUICKAPP）。只在机主同意后挂起；挂起可一条命令还原。
 AD_PKGS = {
-    "OPPO": ["com.opos.ads", "com.heytap.pictorial", "com.nearme.instant.platform", "com.oppo.instant.local.service"],
-    "OnePlus": ["com.opos.ads", "com.heytap.pictorial", "com.nearme.instant.platform", "com.oppo.instant.local.service"],
-    "realme": ["com.opos.ads", "com.heytap.pictorial", "com.nearme.instant.platform", "com.oppo.instant.local.service"],
-    "HONOR": ["com.hihonor.quickengine", "com.hihonor.quickgame", "com.honor.quickgamecenter"],
+    "OPPO": ["com.opos.ads", "com.heytap.pictorial"],
+    "OnePlus": ["com.opos.ads", "com.heytap.pictorial"],
+    "realme": ["com.opos.ads", "com.heytap.pictorial"],
+    "HONOR": [],
     "Xiaomi": ["com.miui.systemAdSolution"],
     "Redmi": ["com.miui.systemAdSolution"],
     "vivo": [],
 }
+
+# 快应用组件：免安装的「轻 App」，广告常用 hap:// 链接把人跳进去。
+# (包名, 名称, 品牌, 是否实测过挂起)
+QUICKAPP = [
+    ("com.nearme.instant.platform", "快应用平台", "OPPO / 一加 / realme", True),
+    ("com.oppo.instant.local.service", "快应用本地服务", "OPPO / 一加 / realme", True),
+    ("com.nearme.instant.card", "快应用卡片", "OPPO / 一加 / realme", True),
+    ("com.hihonor.quickengine", "快应用引擎", "荣耀", True),
+    ("com.hihonor.quickgame", "快游戏", "荣耀", True),
+    ("com.honor.quickgamecenter", "快游戏中心", "荣耀", True),
+    ("com.huawei.fastapp", "快应用中心", "华为", False),
+    ("com.miui.hybrid", "快应用服务框架", "小米 / Redmi", False),
+    ("com.miui.hybrid.accessory", "快应用服务框架辅件", "小米 / Redmi", False),
+    ("com.vivo.hybrid", "快应用", "vivo / iQOO", False),
+]
 # 挂了会坏功能的包，不许挂
 NEVER = {"com.heytap.quicksearchbox", "com.coloros.assistantscreen", "com.android.systemui",
          "com.vivo.systemuiplugin", "com.heytap.market", "com.xiaomi.market", "com.hihonor.appmarket"}
@@ -89,6 +108,50 @@ def suspended(serial, pkg):
     return out.endswith("true")
 
 
+def installed(serial, pkg):
+    return "package:" in sh(serial, f"pm path {pkg}")
+
+
+def quickapps(serial):
+    """装着的快应用组件，带状态。"""
+    ev = sh(serial, "dumpsys usagestats")
+    out = []
+    for pkg, name, brand, tested in QUICKAPP:
+        if not installed(serial, pkg):
+            continue
+        fg = len(re.findall(rf"type=ACTIVITY_RESUMED package={re.escape(pkg)}\b", ev))
+        out.append({
+            "pkg": pkg, "name": name, "brand": brand, "tested": tested,
+            "suspended": suspended(serial, pkg),
+            "running": bool(sh(serial, f"pidof {pkg}") or sh(serial, f"pidof {pkg}:provider")),
+            "used": fg,
+        })
+    return out
+
+
+def record(serial, pkgs, fn="suspended.txt"):
+    with open(os.path.join(latest_backup(serial), fn), "a") as f:
+        for p in pkgs:
+            f.write(p + "\n")
+
+
+DEV_REMINDER = """
+================ 最后一步：关闭开发者模式 ================
+去广告已经做完。开发者模式和 USB 调试用不到了，建议关掉：
+  · 部分银行、支付、游戏 App 检测到 USB 调试开着会提醒或拒绝运行
+  · 关掉以后，别人拿你的手机插电脑也连不上
+
+两种关法，选一种：
+  1) 手机上：设置 → 搜索「开发者选项」→ 关掉页面最上方的总开关
+  2) 电脑上：python3 tool/run.py -s {s} dev-off --yes
+     （执行后电脑和手机断开，这是正常的）
+
+关掉开发者模式不会撤销这次的改动：关掉的开关、挂起的包、关掉的通知都保持原样。
+以后要还原挂起的包，重新打开开发者模式和 USB 调试即可（见 docs/00-打开开发者模式.md）。
+==========================================================
+"""
+
+
 def py(script, *args):
     return subprocess.call([sys.executable, os.path.join(TOOL, script), *args])
 
@@ -126,6 +189,8 @@ def main():
         for p in AD_PKGS.get(i["brand"], []):
             exists = "package:" in sh(s, f"pm path {p}")
             print(f"  广告包 {p}：{'未安装' if not exists else ('已挂起' if suspended(s, p) else '未挂起')}")
+        for q in quickapps(s):
+            print(f"  快应用 {q['pkg']}（{q['name']}）：{'已挂起' if q['suspended'] else '未挂起'}")
         print(f"插电常亮：{sh(s, 'settings get global stay_on_while_plugged_in')}")
 
     elif cmd == "backup":
@@ -182,12 +247,57 @@ def main():
             sh(s, f"pm unsuspend --user 0 {p}")
             print(p, "已挂起" if suspended(s, p) else "已恢复")
 
+    elif cmd == "quickapp":
+        sub = rest[0] if rest else "check"
+        qs = quickapps(s)
+        if not qs:
+            print("没有检测到快应用组件。"); return
+        if sub == "check":
+            print(f"检测到 {len(qs)} 个快应用组件：")
+            for q in qs:
+                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if q['suspended'] else '未挂起'}  "
+                      f"{'后台在跑' if q['running'] else '没在跑'}  "
+                      f"{'近期打开过 %d 次' % q['used'] if q['used'] else '近期没打开过'}"
+                      f"{'' if q['tested'] else '  （这个包的挂起效果还没实测）'}")
+            h = sh(s, "pm query-activities --brief -a android.intent.action.VIEW -d hap://app/x")
+            who = re.findall(r"^\s*(\S+/\S+)$", h, re.M)
+            if who:
+                print(f"hap:// 链接由 {who[0]} 接管：网页或 App 里的广告可以用这类链接跳进快应用。")
+            print("关闭：python3 tool/run.py -s %s quickapp off（要机主同意，可还原）" % s)
+        elif sub == "off":
+            todo = [q["pkg"] for q in qs if not q["suspended"]]
+            for p in todo:
+                sh(s, f"am force-stop {p}")
+                sh(s, f"pm suspend --user 0 {p}")
+            done = [p for p in todo if suspended(s, p)]
+            record(s, done)
+            for q in qs:
+                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if suspended(s, q['pkg']) else '挂起失败'}")
+            print("快应用已关闭。广告里的 hap:// 链接打不开了。恢复：quickapp on")
+        elif sub == "on":
+            for q in qs:
+                sh(s, f"pm unsuspend --user 0 {q['pkg']}")
+                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if suspended(s, q['pkg']) else '已恢复'}")
+        else:
+            sys.exit("quickapp 后面跟 check / off / on")
+
     elif cmd == "finish":
         f = os.path.join(latest_backup(s), "stay_on.txt")
         v = open(f).read().strip() if os.path.exists(f) else "0"
         sh(s, f"settings put global stay_on_while_plugged_in {v or 0}")
         sh(s, "input keyevent HOME")
         print(f"插电常亮已改回 {v or 0}")
+        on = sh(s, "settings get global development_settings_enabled") == "1"
+        if on:
+            print(DEV_REMINDER.format(s=s))
+
+    elif cmd == "dev-off":
+        if "--yes" not in rest:
+            sys.exit("这一步会关闭开发者模式和 USB 调试，电脑随后与手机断开。确认后加 --yes 再执行")
+        print("正在关闭开发者模式……执行后电脑会和手机断开，这是正常的。")
+        sh(s, "settings put global adb_wifi_enabled 0; settings put global development_settings_enabled 0; "
+              "settings put global adb_enabled 0")
+        print("已发出关闭指令。请在手机上打开 设置 → 搜索「开发者选项」，确认总开关是关着的。")
     else:
         print(__doc__)
 

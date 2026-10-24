@@ -20,6 +20,7 @@
 | 推广位 | 商店的轮播、开屏、悬浮活动、签到福利 | 商店「服务管理」里的开关 |
 | 营销推送 | 各 App 的「内容与营销」「活动优惠」通知 | 按渠道关，同一个 App 的订单、快递、更新通知保留 |
 | 广告组件 | `com.opos.ads`、`com.miui.systemAdSolution` 等 | `pm suspend` 挂起，要机主同意 |
+| 快应用 | 广告里一点就跳进去的「免安装小程序」 | `quickapp` 检测，`quickapp off` 关闭，见 [docs/07-快应用.md](docs/07-快应用.md) |
 
 ## 不做的事
 
@@ -85,7 +86,8 @@ python3 tool/run.py -s <序列号> backup       # 改动前快照
 python3 tool/run.py -s <序列号> recipe       # 跑机型脚本
 python3 tool/run.py -s <序列号> chan-scan    # 列营销通知渠道
 python3 tool/run.py -s <序列号> chan-off backups/<型号>-<时间>/channels.tsv
-python3 tool/run.py -s <序列号> finish       # 收尾
+python3 tool/run.py -s <序列号> quickapp     # 检测快应用；quickapp off 关闭
+python3 tool/run.py -s <序列号> finish       # 收尾，提醒关闭开发者模式
 ```
 
 <p align="center"><img src="images/channel-off.png" width="420" alt="营销通知渠道关掉后的样子"></p>
@@ -105,6 +107,7 @@ docs/
   04-给新机型写脚本.md
   05-还原.md
   06-常见问题.md
+  07-快应用.md        什么是快应用、怎么检测和关闭
   清单/               各品牌的手动清单
 prompts/             复制给聊天 AI 的提示词
 tool/

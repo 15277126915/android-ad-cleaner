@@ -25,6 +25,12 @@ if (机主同意挂起广告包？) then (同意)
   :run.py suspend;
 else (不同意)
 endif
+:run.py quickapp\n检测快应用;
+if (机主同意关闭快应用？) then (同意)
+  :run.py quickapp off;
+else (不同意)
+endif
 :run.py finish\n插电常亮改回原值;
+:提醒关闭开发者模式\n手机上关，或 run.py dev-off;
 stop
 @enduml

@@ -103,8 +103,16 @@
 |---|---|---|
 | `com.opos.ads` | OPPO 广告服务 | 正常 |
 | `com.heytap.pictorial` | 乐划锁屏 | 锁屏杂志消失 |
-| `com.nearme.instant.platform` | 快应用平台 | 快应用打不开 |
-| `com.oppo.instant.local.service` | 快应用本地服务 | 同上 |
+
+## 12. 快应用（要 adb，要你同意）
+
+| 包 | 作用 |
+|---|---|
+| `com.nearme.instant.platform` | 快应用平台，接管 `hap://` 链接 |
+| `com.oppo.instant.local.service` | 快应用本地服务 |
+| `com.nearme.instant.card` | 快应用卡片（部分机型有） |
+
+用电脑跑：`run.py quickapp` 检测，`quickapp off` 关闭。见 [07-快应用](../07-快应用.md)。
 
 - ⚠️ 不要挂 `com.heytap.quicksearchbox`（下拉搜索）和 `com.coloros.assistantscreen`（负一屏）。
 
