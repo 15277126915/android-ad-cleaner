@@ -43,7 +43,7 @@
 用法一的开场白，复制给 AI：
 
 ```text
-请克隆 https://github.com/{{REPO}} ，读仓库里的 AGENTS.md，
+请克隆 https://github.com/ddcr448/android-ad-cleaner ，读仓库里的 AGENTS.md，
 然后帮我给连着电脑的这台手机去广告。每一步改之前告诉我要改什么。
 ```
 
