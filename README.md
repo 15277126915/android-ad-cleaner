@@ -2,6 +2,28 @@
 
 关掉国产安卓手机系统里的广告、热搜、资讯推荐和营销推送。
 
+## 下载桌面客户端
+
+插上手机，点几下按钮。不需要 Python，也不需要 AI 工具。
+
+| 电脑 | 下载 | 说明 |
+|---|---|---|
+| Mac · Apple 芯片（M1 及以后） | [AndroidAdCleaner-0.2.0-mac-arm64.dmg](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.0/AndroidAdCleaner-0.2.0-mac-arm64.dmg) | 已签名、通过苹果公证，双击就能打开 |
+| Mac · Intel 芯片 | [AndroidAdCleaner-0.2.0-mac-intel.dmg](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.0/AndroidAdCleaner-0.2.0-mac-intel.dmg) | 同上 |
+| Windows 10 / 11 · 安装版 | [AndroidAdCleaner-0.2.0-windows-setup.exe](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.0/AndroidAdCleaner-0.2.0-windows-setup.exe) | 弹「Windows 已保护你的电脑」时点「更多信息」→「仍要运行」 |
+| Windows 10 / 11 · 免安装 | [AndroidAdCleaner-0.2.0-windows-portable.zip](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.0/AndroidAdCleaner-0.2.0-windows-portable.zip) | 解压后双击 `AndroidAdCleaner.exe` |
+
+不知道 Mac 是哪种芯片：左上角苹果图标 → 关于本机，「芯片」写 Apple M 开头的选 Apple 芯片。所有版本：[Releases](https://github.com/rddmwmddr/android-ad-cleaner/releases)。用法：[docs/08-桌面客户端.md](docs/08-桌面客户端.md)。
+
+| | |
+|---|---|
+| <img src="images/gui-1-connect.png" alt="连接手机"><br>**1 连接手机**：插线即认出手机，内置开启 USB 调试的图文教程 | <img src="images/gui-3-detect.png" alt="检测"><br>**2 检测**：型号、系统版本、机型脚本、快应用、广告组件 |
+| <img src="images/gui-4-choose.png" alt="选择"><br>**3 选择要关的**：营销通知按渠道勾选，服务类默认不勾 | <img src="images/gui-6-run.png" alt="执行"><br>**4 执行**：进度条和实时日志 |
+| <img src="images/gui-7-done.png" alt="完成"><br>**5 完成**：每一步的结果，最后提醒关闭开发者模式 | <img src="images/gui-8-feedback.png" alt="反馈"><br>**反馈**：自动附诊断信息，一键提交 GitHub Issue |
+
+---
+
+
 - 不 root，不解锁，不刷机，系统更新不受影响。
 - 只拨系统和 App 自带的开关。挂起广告包这一步要机主点头，一条命令可以还原。
 - 搜索、负一屏卡片、应用商店的安装和更新、天气预警、快递提醒，这些功能保留。
@@ -42,10 +64,8 @@
 | **一：AI 智能体替你跑** | 有电脑，想省事 | 电脑、数据线、一个能执行命令的 AI 工具 | [docs/02-用AI智能体.md](docs/02-用AI智能体.md) |
 | **二：聊天 AI 带你点** | 只有手机 | DeepSeek、豆包、ChatGPT 任意一个 | [docs/03-用聊天AI.md](docs/03-用聊天AI.md) |
 | **三：照清单手动关** | 想自己掌握每一步 | 只要手机 | [docs/清单/](docs/清单/) |
-| **四：桌面客户端** | 不想敲命令 | Mac（Apple / Intel 芯片）或 Windows 10/11、数据线 | [下载](https://github.com/rddmwmddr/android-ad-cleaner/releases/latest) · [说明](docs/08-桌面客户端.md) |
+| **四：桌面客户端** | 不想敲命令 | Mac（Apple / Intel 芯片）或 Windows 10/11、数据线 | [下载](#下载桌面客户端) · [说明](docs/08-桌面客户端.md) |
 
-<p align="center"><img src="images/gui-2.png" width="560" alt="桌面客户端：检测页"></p>
-<p align="center">桌面客户端：插上手机，检测、勾选、执行，最后提醒关闭开发者模式。</p>
 
 用法一的开场白，复制给 AI：
 
