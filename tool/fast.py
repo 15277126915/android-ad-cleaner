@@ -7,7 +7,7 @@
   fast.py -s SERIAL off [保留词,…]      当前列表里开着的开关全关（保留词命中的不动），一路翻到底
   fast.py -s SERIAL scan                 只读：翻到底列出所有开关
   fast.py -s SERIAL only 词,词…         只关标题含这些词的开关
-  fast.py -s SERIAL run 菜谱.py         跑一个品牌菜谱
+  fast.py -s SERIAL run 机型脚本.py         跑一个品牌机型脚本
 在脚本里：from fast import Phone
 """
 import re, sys, time, xml.etree.ElementTree as ET
@@ -419,10 +419,10 @@ def main():
         build = p.d.shell("getprop ro.build.display.id").output.strip()
         m = re.search(r'^BUILD\s*=\s*"([^"]+)"', src, re.M)
         if m and not build.startswith(m.group(1)):
-            print(f"⚠ 菜谱是按 {m.group(1)} 录的，这台是 {build}：页面可能对不上，没找到的段会快速跳过")
+            print(f"⚠ 机型脚本是按 {m.group(1)} 录的，这台是 {build}：页面可能对不上，没找到的段会快速跳过")
         t = time.time()
         exec(src, g)
-        print(f"\n菜谱跑完：关了 {len(p.changed)} 个，{time.time()-t:.0f} 秒")
+        print(f"\n机型脚本跑完：关了 {len(p.changed)} 个，{time.time()-t:.0f} 秒")
         import json, datetime
         log = rest[0].rsplit("/", 1)[0] + "/run-log.txt" if "/" in rest[0] else "run-log.txt"
         with open(log, "a", encoding="utf-8") as f:

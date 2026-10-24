@@ -1,4 +1,4 @@
-# 荣耀 PNM-AN10（MagicOS 10）菜谱。2026-10-23 实测通过
+# 荣耀 PNM-AN10（MagicOS 10）机型脚本。2026-10-23 实测通过
 # 变量 p 由 tool/fast.py 注入；ONLY 是要跑的段名列表（空=全跑）
 BUILD = ""
 import time

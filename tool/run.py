@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """手机去广告 · 总入口。所有命令都要带 -s <序列号>（adb devices 第一列）。
 
-  python3 tool/run.py devices                      列出连着的手机、型号、系统版本、有没有现成菜谱
-  python3 tool/run.py -s 序列号 check              只读：锁屏、菜谱匹配、广告包挂起状态
+  python3 tool/run.py devices                      列出连着的手机、型号、系统版本、有没有现成机型脚本
+  python3 tool/run.py -s 序列号 check              只读：锁屏、机型脚本匹配、广告包挂起状态
   python3 tool/run.py -s 序列号 backup             改动前快照，存到 backups/<型号>-<时间>/
-  python3 tool/run.py -s 序列号 recipe [段名 …]     跑本机型菜谱（不带段名=全跑）
+  python3 tool/run.py -s 序列号 recipe [段名 …]     跑本机型机型脚本（不带段名=全跑）
   python3 tool/run.py -s 序列号 chan-scan          只读：列出开着的营销通知渠道 → backups/.../channels.tsv
   python3 tool/run.py -s 序列号 chan-off 清单.tsv   关掉清单里的渠道
   python3 tool/run.py -s 序列号 chan-on  清单.tsv   还原
@@ -106,7 +106,7 @@ def main():
             if st != "device":
                 print(f"{ser}\t{st}\t（unauthorized=手机上点「允许 USB 调试」；offline=重插或重开无线调试）"); continue
             i = info(ser); r = recipe_for(i["model"])
-            print(f"{ser}\t{i['name'] or i['brand']+' '+i['model']}\t{i['model']}\t{i['build']}\t菜谱：{os.path.relpath(r, ROOT) if r else '无（只能跑通用部分）'}")
+            print(f"{ser}\t{i['name'] or i['brand']+' '+i['model']}\t{i['model']}\t{i['build']}\t机型脚本：{os.path.relpath(r, ROOT) if r else '无（只能跑通用部分）'}")
         return
     if a[0] != "-s" or len(a) < 3:
         sys.exit("命令格式：run.py -s <序列号> <命令>。先跑 run.py devices 看序列号")
@@ -120,9 +120,9 @@ def main():
             src = open(r, encoding="utf-8").read()
             m = re.search(r'^BUILD\s*=\s*"([^"]*)"', src, re.M)
             ok = (not m) or i["build"].startswith(m.group(1))
-            print(f"菜谱：{os.path.relpath(r, ROOT)}；录制版本 {m.group(1) if m else '未标'}，{'版本一致' if ok else '版本不同，部分步骤可能找不到入口'}")
+            print(f"机型脚本：{os.path.relpath(r, ROOT)}；录制版本 {m.group(1) if m else '未标'}，{'版本一致' if ok else '版本不同，部分步骤可能找不到入口'}")
         else:
-            print("菜谱：没有。可跑：通知渠道 chan-scan/chan-off、广告包挂起；其余照 docs/清单 手动做，或用 tool/explore.py 探路")
+            print("机型脚本：没有。可跑：通知渠道 chan-scan/chan-off、广告包挂起；其余照 docs/清单 手动做，或用 tool/explore.py 探路")
         for p in AD_PKGS.get(i["brand"], []):
             exists = "package:" in sh(s, f"pm path {p}")
             print(f"  广告包 {p}：{'未安装' if not exists else ('已挂起' if suspended(s, p) else '未挂起')}")
@@ -142,7 +142,7 @@ def main():
     elif cmd == "recipe":
         r = recipe_for(info(s)["model"])
         if not r:
-            sys.exit("这个型号没有菜谱。见 docs/04-给新机型做菜谱.md")
+            sys.exit("这个型号没有机型脚本。见 docs/04-给新机型写脚本.md")
         if locked(s):
             sys.exit("手机锁屏了，请机主解锁后再跑")
         sh(s, "settings put global stay_on_while_plugged_in 7")

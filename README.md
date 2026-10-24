@@ -34,6 +34,8 @@
 
 <p align="center"><img src="images/ways.png" width="460" alt="三种用法"></p>
 
+> 用法一要先在手机上打开开发者模式和 USB 调试，带截图的教程：[docs/00-打开开发者模式.md](docs/00-打开开发者模式.md)。
+
 | 用法 | 适合谁 | 要准备什么 | 文档 |
 |---|---|---|---|
 | **一：AI 智能体替你跑** | 有电脑，想省事 | 电脑、数据线、一个能执行命令的 AI 工具 | [docs/02-用AI智能体.md](docs/02-用AI智能体.md) |
@@ -51,7 +53,9 @@
 
 ## 实测过的机型
 
-| 品牌 | 机型（型号） | 系统 | 一键菜谱 | 手动清单 | 营销通知 |
+**机型脚本**：一台机型的自动操作步骤，记着「打开哪个 App、点哪几个字进设置页、关哪几个开关、留哪几个」。电脑照着它在手机上点，几分钟做完。设置页因型号和系统版本而不同，所以每个机型一份。
+
+| 品牌 | 机型（型号） | 系统 | 机型脚本 | 手动清单 | 营销通知 |
 |---|---|---|---|---|---|
 | 荣耀 | PNM-AN10 | MagicOS 10 | ✅ 实测通过，重跑 4 分钟 | ✅ | ✅ 26 个渠道 |
 | OPPO | Find N6（PLP120） | ColorOS 16.0.9 | ⚠️ 路径实测，整段待验证 | ✅ | ✅ 30 个渠道 |
@@ -62,8 +66,8 @@
 | vivo | X300 Ultra（V2547DA） | OriginOS 6 | — | ✅ | ✅ |
 
 - 营销通知和广告跟踪两项是通用的，任何安卓手机都能跑。
-- 同一个品牌，系统小版本不同，设置页的名字和层级也会变。菜谱按型号和系统版本存放，版本对不上时引擎会提示，找不到入口的步骤会跳过，不会乱点。
-- 你的机型不在表里：照 [docs/04-给新机型做菜谱.md](docs/04-给新机型做菜谱.md) 做一份，欢迎提 PR。
+- 同一个品牌，系统小版本不同，设置页的名字和层级也会变。机型脚本按型号和系统版本存放，版本对不上时引擎会提示，找不到入口的步骤会跳过，不会乱点。
+- 你的机型不在表里：照 [docs/04-给新机型写脚本.md](docs/04-给新机型写脚本.md) 做一份，欢迎提 PR。
 
 ---
 
@@ -75,10 +79,10 @@
 
 ```bash
 pip3 install -r requirements.txt
-python3 tool/run.py devices                 # 看序列号、型号、有没有菜谱
+python3 tool/run.py devices                 # 看序列号、型号、有没有机型脚本
 python3 tool/run.py -s <序列号> check        # 只读检查
 python3 tool/run.py -s <序列号> backup       # 改动前快照
-python3 tool/run.py -s <序列号> recipe       # 跑菜谱
+python3 tool/run.py -s <序列号> recipe       # 跑机型脚本
 python3 tool/run.py -s <序列号> chan-scan    # 列营销通知渠道
 python3 tool/run.py -s <序列号> chan-off backups/<型号>-<时间>/channels.tsv
 python3 tool/run.py -s <序列号> finish       # 收尾
@@ -94,10 +98,11 @@ python3 tool/run.py -s <序列号> finish       # 收尾
 ```text
 AGENTS.md            给 AI 智能体读的操作规范
 docs/
-  01-准备工作.md      装 adb、打开 USB 调试
+  00-打开开发者模式.md 带截图的分步教程
+  01-准备工作.md      装 adb、连电脑、无线调试
   02-用AI智能体.md    WorkBuddy、Claude Code、Codex、Trae、Cursor
   03-用聊天AI.md      DeepSeek、豆包、ChatGPT
-  04-给新机型做菜谱.md
+  04-给新机型写脚本.md
   05-还原.md
   06-常见问题.md
   清单/               各品牌的手动清单
@@ -107,7 +112,7 @@ tool/
   fast.py            读屏、找入口、拨开关的引擎（uiautomator2）
   chan_fast.py       营销通知渠道
   explore.py         新机型探路（实验）
-recipes/<品牌>-<型号>/recipe.py   各机型菜谱
+recipes/<品牌>-<型号>/recipe.py   各机型的机型脚本
 images/              文档配图
 ```
 

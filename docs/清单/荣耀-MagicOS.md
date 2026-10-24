@@ -1,6 +1,6 @@
 # 荣耀 / MagicOS 手动清单
 
-实测机型：PNM-AN10（MagicOS 10），2026-10-23。一键菜谱：`recipes/honor-PNM-AN10/`，重跑约 4 分钟。
+实测机型：PNM-AN10（MagicOS 10），2026-10-23。机型脚本：`recipes/honor-PNM-AN10/`，重跑约 4 分钟。
 符号：🔴 关掉　🟢 保留　⚠️ 注意
 
 ---

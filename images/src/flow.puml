@@ -11,9 +11,9 @@ title 一次完整的处理流程
 start
 :手机打开 USB 调试，连上电脑;
 :run.py devices\n认出型号和系统版本;
-:run.py check\n锁屏？有没有菜谱？;
+:run.py check\n锁屏？有没有机型脚本？;
 :run.py backup\n存一份改动前的快照;
-if (有本机型菜谱？) then (有)
+if (有本机型机型脚本？) then (有)
   :run.py recipe\n逐个 App 关广告开关;
 else (没有)
   :照 docs/清单 手动关\n或用 explore.py 探路;

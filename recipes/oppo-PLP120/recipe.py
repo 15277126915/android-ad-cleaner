@@ -1,4 +1,4 @@
-# OPPO Find N6（PLP120，ColorOS 16.0.9）菜谱。路径 2026-10-22 实测，菜谱整段跑待验证
+# OPPO Find N6（PLP120，ColorOS 16.0.9）机型脚本。路径 2026-10-22 实测，机型脚本整段跑待验证
 BUILD = "PLP120_16.0.9"
 # 用法：python3 tool/run.py -s 序列号 recipe [段名…]   不带段名=全跑
 import time

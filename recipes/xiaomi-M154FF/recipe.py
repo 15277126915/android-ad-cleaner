@@ -1,4 +1,4 @@
-# 小米 18 Pro Max（M154FF，HyperOS 4）菜谱。路径 2026-10-22 实测，菜谱整段跑待验证
+# 小米 18 Pro Max（M154FF，HyperOS 4）机型脚本。路径 2026-10-22 实测，机型脚本整段跑待验证
 BUILD = "OS4.0"
 import time
 
