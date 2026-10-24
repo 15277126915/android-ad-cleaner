@@ -126,6 +126,12 @@ recipes/<品牌>-<型号>/recipe.py   各机型的机型脚本
 images/              文档配图
 ```
 
+## 反馈
+
+遇到问题、想要新功能、希望支持你的手机，到 [Issues](https://github.com/rddmwmddr/android-ad-cleaner/issues/new/choose) 提交，选对应的模板。
+
+用桌面客户端的话，点左下角「反馈问题」：会自动附上客户端版本、手机型号、系统版本和最近的日志（序列号已替换，不含应用列表和通知内容），打开 GitHub 页面后点提交即可。提交需要 GitHub 账号。
+
 ## 还原
 
 见 [docs/05-还原.md](docs/05-还原.md)。挂起的包和通知渠道各一条命令；App 内的开关按清单路径手动打开。
