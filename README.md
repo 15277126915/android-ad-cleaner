@@ -42,7 +42,7 @@
 | **一：AI 智能体替你跑** | 有电脑，想省事 | 电脑、数据线、一个能执行命令的 AI 工具 | [docs/02-用AI智能体.md](docs/02-用AI智能体.md) |
 | **二：聊天 AI 带你点** | 只有手机 | DeepSeek、豆包、ChatGPT 任意一个 | [docs/03-用聊天AI.md](docs/03-用聊天AI.md) |
 | **三：照清单手动关** | 想自己掌握每一步 | 只要手机 | [docs/清单/](docs/清单/) |
-| **四：桌面客户端** | 有 Mac，不想敲命令 | Mac（Apple 芯片）、数据线 | [docs/08-桌面客户端.md](docs/08-桌面客户端.md) |
+| **四：桌面客户端** | 有 Mac，不想敲命令 | Mac（Apple 芯片）、数据线 | [下载](https://github.com/rddmwmddr/android-ad-cleaner/releases/latest) · [说明](docs/08-桌面客户端.md) |
 
 <p align="center"><img src="images/gui-2.png" width="560" alt="桌面客户端：检测页"></p>
 <p align="center">桌面客户端：插上手机，检测、勾选、执行，最后提醒关闭开发者模式。</p>
