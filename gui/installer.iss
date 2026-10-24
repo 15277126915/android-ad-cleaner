@@ -11,7 +11,7 @@ AppPublisherURL=https://github.com/rddmwmddr/android-ad-cleaner
 DefaultDirName={autopf}\AndroidAdCleaner
 DefaultGroupName=安卓去广告
 DisableProgramGroupPage=yes
-OutputDir=..\dist
+OutputDir=dist
 OutputBaseFilename=AndroidAdCleaner-{#APPVER}-windows-setup
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\AndroidAdCleaner.exe
@@ -33,7 +33,7 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "..\dist\AndroidAdCleaner\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\AndroidAdCleaner\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\安卓去广告"; Filename: "{app}\AndroidAdCleaner.exe"
