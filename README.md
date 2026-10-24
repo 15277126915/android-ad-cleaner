@@ -2,6 +2,8 @@
 
 关掉国产安卓手机系统里的广告、热搜、资讯推荐和营销推送。
 
+介绍页：**https://rddmwmddr.github.io/android-ad-cleaner/**
+
 ## 下载桌面客户端
 
 插上手机，点几下按钮。不需要 Python，也不需要 AI 工具。
