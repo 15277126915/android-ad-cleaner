@@ -261,9 +261,12 @@ def main():
                       f"{'' if q['tested'] else '  （这个包的挂起效果还没实测）'}")
             h = sh(s, "pm query-activities --brief -a android.intent.action.VIEW -d hap://app/x")
             who = re.findall(r"^\s*(\S+/\S+)$", h, re.M)
-            if who:
-                print(f"hap:// 链接由 {who[0]} 接管：网页或 App 里的广告可以用这类链接跳进快应用。")
-            print("关闭：python3 tool/run.py -s %s quickapp off（要机主同意，可还原）" % s)
+            if all(q["suspended"] for q in qs):
+                print("快应用已全部关闭。广告里的 hap:// 链接会弹「应用无法使用」，不会跳进快应用。恢复：quickapp on")
+            else:
+                if who:
+                    print(f"hap:// 链接由 {who[0]} 接管：网页或 App 里的广告可以用这类链接跳进快应用。")
+                print("关闭：python3 tool/run.py -s %s quickapp off（要机主同意，可还原）" % s)
         elif sub == "off":
             todo = [q["pkg"] for q in qs if not q["suspended"]]
             for p in todo:
@@ -273,7 +276,7 @@ def main():
             record(s, done)
             for q in qs:
                 print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if suspended(s, q['pkg']) else '挂起失败'}")
-            print("快应用已关闭。广告里的 hap:// 链接打不开了。恢复：quickapp on")
+            print("快应用已关闭。广告里的 hap:// 链接会弹「应用无法使用」，不会跳进快应用。恢复：quickapp on")
         elif sub == "on":
             for q in qs:
                 sh(s, f"pm unsuspend --user 0 {q['pkg']}")
