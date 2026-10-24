@@ -213,21 +213,23 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;justify-content:space-bet
 const REL = {
   version: "0.2.0",
   github: "https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.0/",
-  baidu: { url: "", code: "" },      // 百度网盘分享链接和提取码，填好后网页自动显示
+  // 百度网盘：每个版本可以单独填链接（files 里的 baidu）；没填的用这里的总链接（整个大文件夹的分享）
+  baidu: { url: "", code: "" },
   files: [
-    { id: "mac-arm64", title: "Mac · Apple 芯片", sub: "M1 / M2 / M3 / M4 及以后", file: "AndroidAdCleaner-0.2.0-mac-arm64.dmg", size: "34 MB",
+    { id: "mac-arm64", folder: "Mac-Apple芯片", baidu: { url: "", code: "" }, title: "Mac · Apple 芯片", sub: "M1 / M2 / M3 / M4 及以后", file: "AndroidAdCleaner-0.2.0-mac-arm64.dmg", size: "34 MB",
       note: "已签名并通过苹果公证，双击就能打开", sha: "2735eb7cbb9e99b6b7f3453b6f5b89259be10102fe6d4a2af053a8b151037343" },
-    { id: "mac-intel", title: "Mac · Intel 芯片", sub: "2020 年及以前的 Intel Mac", file: "AndroidAdCleaner-0.2.0-mac-intel.dmg", size: "39 MB",
+    { id: "mac-intel", folder: "Mac-Intel芯片", baidu: { url: "", code: "" }, title: "Mac · Intel 芯片", sub: "2020 年及以前的 Intel Mac", file: "AndroidAdCleaner-0.2.0-mac-intel.dmg", size: "39 MB",
       note: "已签名并通过苹果公证", sha: "be8e9dbd12b87f62370db1f471e3666840ec5c51185438c4773235ab28f2c52a" },
-    { id: "win-setup", title: "Windows · 安装版", sub: "Windows 10 / 11（64 位）", file: "AndroidAdCleaner-0.2.0-windows-setup.exe", size: "29 MB",
+    { id: "win-setup", folder: "Windows-安装版", baidu: { url: "", code: "" }, title: "Windows · 安装版", sub: "Windows 10 / 11（64 位）", file: "AndroidAdCleaner-0.2.0-windows-setup.exe", size: "29 MB",
       note: "弹出安全提示时点「更多信息」→「仍要运行」", sha: "f6f5b8091aa683146e5c567e6143cd18b33e4a51c32a3657cc486660dbdd4947" },
-    { id: "win-zip", title: "Windows · 免安装", sub: "Windows 10 / 11（64 位）", file: "AndroidAdCleaner-0.2.0-windows-portable.zip", size: "43 MB",
+    { id: "win-zip", folder: "Windows-免安装版", baidu: { url: "", code: "" }, title: "Windows · 免安装", sub: "Windows 10 / 11（64 位）", file: "AndroidAdCleaner-0.2.0-windows-portable.zip", size: "43 MB",
       note: "解压后双击 AndroidAdCleaner.exe", sha: "80c9f2212fbf2368a64482fa2bdb04b7be3e193cb3e86f853c4cf8de78a3a07f" },
   ],
 };
 /* ================================================ */
 
-const hasBaidu = !!REL.baidu.url;
+const pan = f => (f.baidu && f.baidu.url) ? f.baidu : (REL.baidu.url ? REL.baidu : null);
+const hasBaidu = REL.files.some(f => pan(f));
 document.querySelectorAll(".ver").forEach(e => e.textContent = REL.version);
 
 function guessOS(){
@@ -251,21 +253,23 @@ document.getElementById("dl-grid").innerHTML = REL.files.map(f => `
     <span class="tag">推荐你的电脑</span>
     <h3>${f.title}</h3>
     <div class="meta">${f.sub} · ${f.size}</div>
-    <a class="btn primary" href="${hasBaidu ? REL.baidu.url : "#baidu-box"}" ${hasBaidu ? 'target="_blank" rel="noopener"' : ""}>国内下载（百度网盘）</a>
+    <a class="btn primary" href="${pan(f) ? pan(f).url : "#baidu-box"}" ${pan(f) ? 'target="_blank" rel="noopener"' : ""}>国内下载（百度网盘）</a>
     <a class="btn line" href="${REL.github + f.file}">GitHub 下载</a>
-    <div class="note">${f.note}</div>
+    <div class="note">${f.note}${pan(f) ? `<br>网盘文件夹「${f.folder}」${pan(f).code ? `，提取码 <b>${pan(f).code}</b>` : ""}` : ""}</div>
   </div>`).join("");
 
-document.getElementById("baidu-box").innerHTML = hasBaidu
-  ? `百度网盘：<a href="${REL.baidu.url}" target="_blank" rel="noopener">${REL.baidu.url}</a>　提取码 <code>${REL.baidu.code}</code><br>网盘里是同一个文件夹，按上面的文件名找对应的版本，文件夹里附了安装说明。`
-  : `国内下载（百度网盘）整理中，暂时请用 GitHub 下载。`;
+document.getElementById("baidu-box").innerHTML = !hasBaidu
+  ? `国内下载（百度网盘）整理中，暂时请用 GitHub 下载。`
+  : REL.baidu.url
+    ? `百度网盘（全部版本）：<a href="${REL.baidu.url}" target="_blank" rel="noopener">${REL.baidu.url}</a>${REL.baidu.code ? `　提取码 <code>${REL.baidu.code}</code>` : ""}<br>每个版本一个文件夹，文件夹里附了安装说明。`
+    : `百度网盘：每个版本单独一个分享，点上面卡片里的「国内下载」。提取码写在卡片下方。`;
 
 const r = REL.files.find(f => f.id === rec);
 if (r){
   document.getElementById("hero-os").textContent = "· " + r.title;
   document.getElementById("hero-gh").href = REL.github + r.file;
-  document.getElementById("hero-cn").href = hasBaidu ? REL.baidu.url : "#download";
-  if (hasBaidu) document.getElementById("hero-cn").target = "_blank";
+  document.getElementById("hero-cn").href = pan(r) ? pan(r).url : "#download";
+  if (pan(r)) document.getElementById("hero-cn").target = "_blank";
 }
 const sums = REL.files.filter(f => f.sha);
 document.getElementById("sums").innerHTML = sums.length
