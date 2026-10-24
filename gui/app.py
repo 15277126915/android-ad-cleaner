@@ -61,7 +61,7 @@ def find_adb():
 def child_env(adb):
     e = dict(os.environ)
     e.update({"ADB": adb or "", "ADBUTILS_ADB_PATH": adb or "", "AAC_BACKUPS": BACKUPS,
-              "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"})
+              "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1", "AAC_GUI": "1"})
     if adb:
         e["PATH"] = os.path.dirname(adb) + os.pathsep + e.get("PATH", "")
     return e
@@ -240,7 +240,7 @@ class Api:
                 j["proc"] = p
                 tail = []
                 for line in p.stdout:
-                    self._log(line); tail.append(line.strip()); tail = tail[-12:]
+                    self._log(line); tail.append(line.strip()); tail = tail[-80:]
                 rc = p.wait()
             except Exception as e:
                 rc, tail = -1, [str(e)]

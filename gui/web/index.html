@@ -200,7 +200,10 @@ async function showDetect(){
   const qa = st.quickapps, qaOff = qa.filter(q => q.suspended).length;
   const warns = [];
   if (st.locked) warns.push(`<div class="note warn">手机锁屏了。请解锁手机并保持亮屏，然后点「重新检测」。</div>`);
-  if (st.fold_open) warns.push(`<div class="note warn">这是展开的折叠屏。展开后是左右分栏，自动操作会找错位置。请合上手机用外屏，然后点「重新检测」。</div>`);
+  const foldBlock = st.fold_open && st.steps.length > 0;
+  if (st.fold_open) warns.push(foldBlock
+    ? `<div class="note warn">这是展开的折叠屏。展开后是左右分栏，自动关 App 开关会找错位置。请合上手机用外屏，然后点「重新检测」。</div>`
+    : `<div class="note info">这是展开的折叠屏。营销通知、快应用、广告组件不受影响，可以继续。</div>`);
   main().innerHTML = `<h1>检测</h1><p class="lead">只读检测完成。</p>${warns.join("")}
     <div class="grid">
       <div class="kv"><small>手机</small><span>${esc(name)}</span></div>
@@ -213,7 +216,7 @@ async function showDetect(){
     ${st.recipe ? "" : `<div class="note info" style="margin-top:14px">这个机型还没有机型脚本：营销通知、快应用、广告组件可以自动处理；各 App 里的广告开关要照<a href="#" onclick="api.open_url('https://github.com/rddmwmddr/android-ad-cleaner/tree/main/docs/清单');return false">清单</a>手动关。</div>`}
     ${st.recipe && !st.recipe_ok ? `<div class="note warn" style="margin-top:14px">机型脚本是按 ${esc(st.recipe_build)} 录的，这台是 ${esc(i.build)}。部分步骤可能找不到入口，找不到会跳过，不会乱点。</div>` : ""}
     <div class="actions"><button class="btn plain" onclick="showConnect()">换一台</button><button class="btn plain" onclick="showDetect()">重新检测</button>
-    <button class="btn" ${st.locked || st.fold_open ? "disabled" : ""} onclick="showChoose()">下一步</button></div>`;
+    <button class="btn" ${st.locked || foldBlock ? "disabled" : ""} onclick="showChoose()">下一步</button></div>`;
 }
 
 /* ---------- 3 选择 ---------- */
@@ -265,6 +268,11 @@ async function go(){
     quickapp: !!($("#c-qa") && $("#c-qa").checked),
     ads: [...document.querySelectorAll(".c-ad:checked")].map(x => x.value),
   };
+  if (!plan.steps.length && !plan.channels.length && !plan.quickapp && !plan.ads.length){
+    modal(`<h3>还没勾选任何一项</h3><p class="lead">勾选要关的项目后再开始。都不需要关的话，可以直接到完成页关闭开发者模式。</p>
+      <div class="actions"><button class="btn plain" onclick="closeModal()">返回勾选</button><button class="btn" onclick="closeModal();showDone({sec:0,cancel:false,results:[]})">去完成页</button></div>`);
+    return;
+  }
   const r = await api.start(S.serial, plan);
   if (r.error){ modal(`<h3>没法开始</h3><p>${esc(r.error)}</p><div class="actions"><button class="btn" onclick="closeModal()">好</button></div>`); return; }
   S.plan = plan; S.logNext = 0; showRun();
@@ -302,8 +310,9 @@ function summarize(res){
 function showDone(r){
   setStep(5);
   const ok = r.results.every(x => x.rc === 0) && !r.cancel;
+  if (!r.results.length){ r.results = []; }
   main().innerHTML = `<h1>${ok ? "完成" : "已结束（有步骤没成功）"}</h1><p class="lead">用时 ${r.sec} 秒。去下拉搜索、负一屏、应用商店、浏览器看一眼，确认功能正常。</p>
-    <div class="card">${r.results.map(x => `<div class="res"><span class="tag ${x.rc === 0 ? "ok" : "bad"}">${x.rc === 0 ? "成功" : "失败"}</span><span class="t">${esc(x.title)}</span><span class="d">${esc(summarize(x))} · ${x.sec} 秒</span></div>`).join("")}</div>
+    <div class="card ${r.results.length ? "" : "hide"}">${r.results.map(x => `<div class="res"><span class="tag ${x.rc === 0 ? "ok" : "bad"}">${x.rc === 0 ? "成功" : "失败"}</span><span class="t">${esc(x.title)}</span><span class="d">${esc(summarize(x))} · ${x.sec} 秒</span></div>`).join("")}</div>
     <div class="card"><h3>最后一步：关闭开发者模式</h3>
       <p class="lead" style="margin:0 0 12px">开发者模式和 USB 调试用不到了，建议关掉：部分银行、支付、游戏 App 检测到它开着会提醒或拒绝运行；关掉后别人拿你的手机插电脑也连不上。<br>关掉<b>不会撤销</b>这次的改动。</p>
       <div class="row"><button class="btn" onclick="askDevOff()">帮我关闭</button><button class="btn plain" onclick="selfOff()">我在手机上自己关</button></div></div>

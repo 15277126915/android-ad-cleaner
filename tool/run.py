@@ -212,7 +212,7 @@ def main():
         st = "\n".join(f"## {n}\n" + sh(s, f"settings list {n}") for n in ("system", "secure", "global"))
         open(os.path.join(d, "settings-before.txt"), "w").write(st)
         open(os.path.join(d, "stay_on.txt"), "w").write(sh(s, "settings get global stay_on_while_plugged_in"))
-        print(f"快照已存：{os.path.relpath(d, ROOT)}")
+        print(f"快照已存：{d if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
 
     elif cmd == "recipe":
         r = recipe_for(info(s)["model"])
@@ -302,7 +302,10 @@ def main():
         print(f"插电常亮已改回 {v or 0}")
         on = sh(s, "settings get global development_settings_enabled") == "1"
         if on:
-            print(DEV_REMINDER.format(s=s))
+            msg = DEV_REMINDER.format(s=s)
+            if os.environ.get("AAC_GUI"):
+                msg = msg.replace(f"2) 电脑上：python3 tool/run.py -s {s} dev-off --yes", "2) 电脑上：点客户端完成页的「帮我关闭」")
+            print(msg)
 
     elif cmd == "status-json":
         import json
