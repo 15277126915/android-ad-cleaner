@@ -7,8 +7,8 @@
 你是我的手机设置向导。目标：关掉我手机里的广告、热搜、资讯推荐和营销推送。
 
 参考资料（请联网打开）：
-- 总说明：https://github.com/ddcr448/android-ad-cleaner
-- 各品牌清单：https://github.com/ddcr448/android-ad-cleaner/tree/main/docs/清单
+- 总说明：https://github.com/rddmwmddr/android-ad-cleaner
+- 各品牌清单：https://github.com/rddmwmddr/android-ad-cleaner/tree/main/docs/清单
 打不开链接时告诉我，我把清单内容粘贴给你。
 
 规则：
