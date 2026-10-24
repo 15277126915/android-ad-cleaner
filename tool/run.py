@@ -66,7 +66,8 @@ ADB = adb_bin()
 
 
 def sh(serial, cmd, check=False):
-    r = subprocess.run([ADB, "-s", serial, "shell", cmd], capture_output=True, text=True)
+    r = subprocess.run([ADB, "-s", serial, "shell", cmd], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       creationflags=0x08000000 if os.name == "nt" else 0)
     return r.stdout.strip()
 
 
@@ -140,7 +141,7 @@ def fold_open(serial):
 
 
 def record(serial, pkgs, fn="suspended.txt"):
-    with open(os.path.join(latest_backup(serial), fn), "a") as f:
+    with open(os.path.join(latest_backup(serial), fn), "a", encoding="utf-8") as f:
         for p in pkgs:
             f.write(p + "\n")
 
@@ -171,7 +172,7 @@ def main():
     if not a or a[0] in ("-h", "--help"):
         print(__doc__); return
     if a[0] == "devices":
-        out = subprocess.run([ADB, "devices"], capture_output=True, text=True).stdout
+        out = subprocess.run([ADB, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         rows = [l.split("\t") for l in out.splitlines()[1:] if "\t" in l]
         if not rows:
             print("没有连着的手机。检查数据线、USB 调试，见 docs/01-准备工作.md")
@@ -205,13 +206,13 @@ def main():
 
     elif cmd == "backup":
         d = latest_backup(s, create=True)
-        open(os.path.join(d, "info.txt"), "w").write("\n".join(f"{k}={v}" for k, v in info(s).items()))
+        open(os.path.join(d, "info.txt"), "w", encoding="utf-8").write("\n".join(f"{k}={v}" for k, v in info(s).items()))
         for name, c in [("sys.txt", "pm list packages -s"), ("user.txt", "pm list packages -3"),
                         ("disabled.txt", "pm list packages -d"), ("notif.txt", "dumpsys notification --noredact")]:
-            open(os.path.join(d, name), "w").write(sh(s, c))
+            open(os.path.join(d, name), "w", encoding="utf-8").write(sh(s, c))
         st = "\n".join(f"## {n}\n" + sh(s, f"settings list {n}") for n in ("system", "secure", "global"))
-        open(os.path.join(d, "settings-before.txt"), "w").write(st)
-        open(os.path.join(d, "stay_on.txt"), "w").write(sh(s, "settings get global stay_on_while_plugged_in"))
+        open(os.path.join(d, "settings-before.txt"), "w", encoding="utf-8").write(st)
+        open(os.path.join(d, "stay_on.txt"), "w", encoding="utf-8").write(sh(s, "settings get global stay_on_while_plugged_in"))
         print(f"快照已存：{d if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
 
     elif cmd == "recipe":
@@ -226,7 +227,7 @@ def main():
     elif cmd == "chan-scan":
         d = latest_backup(s)
         out = subprocess.run([sys.executable, os.path.join(TOOL, "chan_fast.py"), "-s", s, "scan"],
-                             capture_output=True, text=True).stdout
+                             capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         f = os.path.join(d, "channels.tsv")
         open(f, "w", encoding="utf-8").write(
             "# 包名\t渠道id\t渠道名。人工核对：删掉服务类（热点共享、红包、防盗、直播提醒等）后再 chan-off\n" + out)
@@ -242,7 +243,7 @@ def main():
         if bad:
             sys.exit(f"这些包挂了会坏功能，不挂：{bad}")
         d = latest_backup(s)
-        with open(os.path.join(d, "suspended.txt"), "a") as f:
+        with open(os.path.join(d, "suspended.txt"), "a", encoding="utf-8") as f:
             for p in rest:
                 print(p, sh(s, f"pm suspend --user 0 {p}").splitlines()[-1:] or "")
                 if suspended(s, p):
@@ -252,7 +253,7 @@ def main():
         pk = rest
         if not pk:
             f = os.path.join(latest_backup(s), "suspended.txt")
-            pk = sorted(set(open(f).read().split())) if os.path.exists(f) else []
+            pk = sorted(set(open(f, encoding="utf-8").read().split())) if os.path.exists(f) else []
         for p in pk:
             sh(s, f"pm unsuspend --user 0 {p}")
             print(p, "已挂起" if suspended(s, p) else "已恢复")
@@ -296,7 +297,7 @@ def main():
 
     elif cmd == "finish":
         f = os.path.join(latest_backup(s), "stay_on.txt")
-        v = open(f).read().strip() if os.path.exists(f) else "0"
+        v = open(f, encoding="utf-8").read().strip() if os.path.exists(f) else "0"
         sh(s, f"settings put global stay_on_while_plugged_in {v or 0}")
         sh(s, "input keyevent HOME")
         print(f"插电常亮已改回 {v or 0}")

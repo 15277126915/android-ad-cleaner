@@ -1,0 +1,62 @@
+# Windows 版：打包、冒烟测试、生成安装程序和便携版 zip。
+# 手动运行（Actions → build-windows → Run workflow），或推送 v* 标签时运行并上传到对应 Release。
+name: build-windows
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: pip install pywebview pyinstaller uiautomator2 pillow
+      - name: 读版本号
+        id: ver
+        run: |
+          $v = python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('gui/app.py', encoding='utf-8').read()).group(1))"
+          "ver=$v" >> $env:GITHUB_OUTPUT
+      - name: PyInstaller 打包
+        run: |
+          pyinstaller --noconfirm --windowed --name AndroidAdCleaner --icon gui/icon.ico `
+            --distpath gui/dist --workpath gui/build --specpath gui/build `
+            --add-data "$PWD/tool;tool" --add-data "$PWD/recipes;recipes" `
+            --add-data "$PWD/images;images" --add-data "$PWD/gui/web;gui/web" `
+            --collect-all uiautomator2 --collect-all adbutils --collect-all webview `
+            --hidden-import uiautomator2 --hidden-import adbutils --hidden-import PIL `
+            gui/app.py
+      - name: 冒烟测试（命令行模式经管道输出，和客户端调用方式一致）
+        run: |
+          $env:ADB = "$env:ANDROID_HOME\platform-tools\adb.exe"
+          $env:ADBUTILS_ADB_PATH = $env:ADB
+          python -c "import subprocess,sys; r=subprocess.run([r'gui\dist\AndroidAdCleaner\AndroidAdCleaner.exe','--cli','run.py','devices'],capture_output=True,text=True,encoding='utf-8',timeout=120); print('rc',r.returncode); print(r.stdout); print(r.stderr[-2000:]); sys.exit(0 if ('没有连着的手机' in r.stdout or 'device' in r.stdout) else 1)"
+          python -c "import subprocess,sys; r=subprocess.run([r'gui\dist\AndroidAdCleaner\AndroidAdCleaner.exe','--cli','run.py','--help'],capture_output=True,text=True,encoding='utf-8',timeout=60); print(r.stdout[:300]); sys.exit(0 if 'run.py' in r.stdout else 1)"
+      - name: 便携版 zip
+        run: Compress-Archive -Path gui/dist/AndroidAdCleaner -DestinationPath "gui/dist/AndroidAdCleaner-${{ steps.ver.outputs.ver }}-windows-portable.zip"
+      - name: 安装程序（Inno Setup）
+        run: |
+          try { Invoke-WebRequest "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" -OutFile gui/ChineseSimplified.isl } catch { Write-Host "中文语言包下载失败，安装界面用英文" }
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DVER=${{ steps.ver.outputs.ver }}" gui/installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ steps.ver.outputs.ver }}
+          path: |
+            gui/dist/*.zip
+            gui/dist/*-setup.exe
+      - name: 上传到 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" gui/dist/*.zip gui/dist/*-setup.exe --clobber

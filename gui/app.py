@@ -31,7 +31,20 @@ BACKUPS = os.path.join(DATA, "backups")
 
 
 # ---------- 命令行模式：打包后子进程走这里 ----------
+def _fix_stdio():
+    """Windows 窗口程序没有控制台：父进程用管道接输出时，把 1/2 号句柄包成 sys.stdout/stderr。"""
+    import io
+    for fd, name in ((1, "stdout"), (2, "stderr")):
+        if getattr(sys, name) is None:
+            try:
+                setattr(sys, name, io.TextIOWrapper(os.fdopen(fd, "wb", buffering=0), encoding="utf-8",
+                                                    errors="replace", line_buffering=True, write_through=True))
+            except OSError:
+                setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+
+
 def cli_main():
+    _fix_stdio()
     script, args = sys.argv[2], sys.argv[3:]
     sys.path.insert(0, TOOL)
     sys.argv = [os.path.join(TOOL, script)] + args
@@ -308,7 +321,18 @@ def main():
     api = Api()
     w = webview.create_window(APP_NAME, os.path.join(BASE, "gui", "web", "index.html"), js_api=api,
                               width=1080, height=780, min_size=(900, 640))
-    webview.start(debug="--debug" in sys.argv)
+    if IS_WIN:
+        try:
+            webview.start(gui="edgechromium", debug="--debug" in sys.argv)
+        except Exception as e:      # 缺 WebView2 运行时（部分 Windows 10）
+            import ctypes, webbrowser
+            url = "https://developer.microsoft.com/microsoft-edge/webview2/"
+            ctypes.windll.user32.MessageBoxW(0, "这台电脑缺少微软 Edge WebView2 运行时，界面没法显示。\n\n"
+                                                "点「确定」打开微软官网，下载安装「Evergreen Bootstrapper」后重新打开本程序。\n\n"
+                                                f"（{e}）", APP_NAME, 0x40)
+            webbrowser.open(url)
+    else:
+        webview.start(debug="--debug" in sys.argv)
 
 
 if __name__ == "__main__":
