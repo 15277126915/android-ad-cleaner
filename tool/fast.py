@@ -11,6 +11,11 @@
 在脚本里：from fast import Phone
 """
 import re, sys, time, xml.etree.ElementTree as ET
+for _st in (sys.stdout, sys.stderr):
+    try:
+        _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
+    except Exception:
+        pass
 import uiautomator2 as u2
 
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")

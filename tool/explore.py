@@ -5,6 +5,11 @@
 遇到「同意」协议页直接跳过；只点「以后再说/取消/禁止」这类拒绝按钮。
 """
 import re, sys, time, os
+for _st in (sys.stdout, sys.stderr):
+    try:
+        _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
+    except Exception:
+        pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fast import Phone
 

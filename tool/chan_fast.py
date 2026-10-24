@@ -7,6 +7,11 @@
 清单.tsv：包名<TAB>渠道id<TAB>说明，一行一个；# 开头是注释。
 """
 import re, shlex, sys, time, os
+for _st in (sys.stdout, sys.stderr):
+    try:
+        _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
+    except Exception:
+        pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fast import Phone
 

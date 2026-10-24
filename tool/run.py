@@ -18,6 +18,11 @@
   python3 tool/run.py -s 序列号 status-json        只读：一次输出全部状态（JSON，给图形界面用）
 """
 import datetime, glob, os, re, shutil, subprocess, sys
+for _st in (sys.stdout, sys.stderr):
+    try:
+        _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
+    except Exception:
+        pass
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tool")

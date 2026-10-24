@@ -84,6 +84,13 @@ label.chk small{color:var(--sub);display:block}
 .modal .box{background:var(--panel);border-radius:14px;padding:22px 24px;width:min(460px,90vw);box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .modal h3{margin:0 0 8px}
 .hide{display:none!important}
+.fb-types{display:flex;gap:8px;margin:10px 0}
+.fb-types label{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;text-align:center;font-weight:600}
+.fb-types input{display:none}
+.fb-types label:has(input:checked){border-color:var(--accent);background:var(--accent-weak);color:var(--accent)}
+textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;background:var(--bg);color:var(--text);resize:vertical}
+textarea.mono{font-family:var(--mono);font-size:12px}
+.modal .box.wide{width:min(640px,92vw);max-height:88vh;overflow:auto}
 </style>
 </head>
 <body>
@@ -98,6 +105,7 @@ label.chk small{color:var(--sub);display:block}
     <div class="side-foot">
       <button class="link" onclick="openRestore()">↺ 还原改动</button>
       <button class="link" onclick="api.open_path('backups')">📁 打开备份文件夹</button>
+      <button class="link" onclick="openFeedback()">💬 反馈问题</button>
       <button class="link" onclick="api.open_url('https://github.com/rddmwmddr/android-ad-cleaner')">？使用说明</button>
       <div class="ver" id="ver"></div>
     </div>
@@ -119,7 +127,7 @@ function setStep(n){
     const k = +e.dataset.s; e.classList.toggle("on", k === n); e.classList.toggle("done", k < n);
   });
 }
-function modal(html){ $("#modalbox").innerHTML = html; $("#modal").classList.add("show"); }
+function modal(html, wide){ $("#modalbox").innerHTML = html; $("#modalbox").classList.toggle("wide", !!wide); $("#modal").classList.add("show"); }
 function closeModal(){ $("#modal").classList.remove("show"); }
 
 window.addEventListener("pywebviewready", async () => {
@@ -316,6 +324,7 @@ function showDone(r){
     <div class="card"><h3>最后一步：关闭开发者模式</h3>
       <p class="lead" style="margin:0 0 12px">开发者模式和 USB 调试用不到了，建议关掉：部分银行、支付、游戏 App 检测到它开着会提醒或拒绝运行；关掉后别人拿你的手机插电脑也连不上。<br>关掉<b>不会撤销</b>这次的改动。</p>
       <div class="row"><button class="btn" onclick="askDevOff()">帮我关闭</button><button class="btn plain" onclick="selfOff()">我在手机上自己关</button></div></div>
+    ${ok ? "" : `<div class="note bad">有步骤没成功。<a href="#" onclick="openFeedback('bug');return false">反馈这个问题</a>，会附上这次的日志，方便定位。</div>`}
     <details class="card"><summary>查看完整日志</summary><div class="log" style="height:260px">${esc(document.querySelector("#log")?.textContent || "")}</div></details>`;
 }
 function askDevOff(){
@@ -328,6 +337,44 @@ async function devOff(){
 }
 function selfOff(){
   modal(`<h3>在手机上关闭</h3><p class="lead">设置 → 顶部搜索「开发者选项」→ 关掉页面最上方的总开关。</p><div class="actions"><button class="btn" onclick="closeModal()">好</button></div>`);
+}
+
+/* ---------- 反馈 ---------- */
+const REPO = "https://github.com/rddmwmddr/android-ad-cleaner";
+const FB = {bug: ["遇到问题", "bug_report.md", "[问题] "], idea: ["功能建议", "feature_request.md", "[建议] "], device: ["适配新机型", "new_device.md", "[新机型] "]};
+async function openFeedback(type){
+  type = type || "bug";
+  const diag = await api.diagnostics();
+  modal(`<h3>反馈问题</h3>
+    <p class="lead" style="margin:0">提交后会打开 GitHub 的新建 Issue 页面，内容已经填好。需要登录 GitHub 账号（免费注册）。</p>
+    <div class="fb-types">${Object.entries(FB).map(([k, v]) => `<label><input type="radio" name="fbt" value="${k}" ${k === type ? "checked" : ""}>${v[0]}</label>`).join("")}</div>
+    <textarea id="fbtext" rows="5" placeholder="发生了什么？你希望怎样？
+比如：执行到「关闭营销通知」时卡住了；或者：希望支持 vivo X200。"></textarea>
+    <label class="chk"><input type="checkbox" id="fbdiag" checked><span>附带诊断信息<small>客户端版本、电脑系统、手机型号和系统版本、执行结果和最近的日志。手机序列号已替换掉，不含应用列表和通知内容。可以在下面修改。</small></span></label>
+    <details><summary>查看 / 修改诊断信息</summary><textarea id="fbdiagtext" class="mono" rows="10" style="margin-top:8px">${esc(diag)}</textarea></details>
+    <div id="fbmsg" class="note info hide" style="margin-top:12px"></div>
+    <div class="actions"><button class="btn plain" onclick="closeModal()">取消</button><button class="btn" onclick="sendFeedback()">提交到 GitHub</button></div>`, true);
+}
+async function sendFeedback(){
+  const type = (document.querySelector("input[name=fbt]:checked") || {}).value || "bug";
+  const text = $("#fbtext").value.trim();
+  if (!text){ $("#fbtext").focus(); $("#fbtext").placeholder = "请先写一句发生了什么"; return; }
+  const diag = $("#fbdiag").checked ? $("#fbdiagtext").value : "";
+  const [, tpl, prefix] = FB[type];
+  const title = prefix + text.split("\n")[0].slice(0, 60);
+  let body = `## 描述\n\n${text}\n` + (diag ? `\n## 诊断信息\n\n${diag}\n` : "");
+  const base = `${REPO}/issues/new?template=${tpl}&title=${encodeURIComponent(title)}&body=`;
+  let url = base + encodeURIComponent(body);
+  const msg = $("#fbmsg");
+  if (url.length > 7500){      // 网址太长浏览器会截断：完整内容放剪贴板
+    await api.copy_text(body);
+    url = base + encodeURIComponent(`## 描述\n\n${text}\n\n## 诊断信息\n\n（内容较长，已复制到剪贴板，请在这里粘贴）\n`);
+    msg.textContent = "诊断信息较长，已复制到剪贴板。打开的页面里，在「诊断信息」下面粘贴即可。";
+  } else {
+    msg.textContent = "已在浏览器里打开 GitHub。登录后检查一下内容，点「Submit new issue」提交。";
+  }
+  msg.classList.remove("hide");
+  api.open_url(url);
 }
 
 /* ---------- 还原 ---------- */

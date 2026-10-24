@@ -45,6 +45,11 @@ def _fix_stdio():
 
 def cli_main():
     _fix_stdio()
+    for st in (sys.stdout, sys.stderr):        # Windows 控制台默认 cp1252/GBK，中文和 ✗ ▶ 会报错；打包后 PYTHONIOENCODING 不生效
+        try:
+            st.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     script, args = sys.argv[2], sys.argv[3:]
     sys.path.insert(0, TOOL)
     sys.argv = [os.path.join(TOOL, script)] + args
@@ -88,6 +93,14 @@ def cmd_for(script, *args):
     return [sys.executable, "-u", os.path.join(TOOL, script), *args]
 
 
+def os_name():
+    if platform.system() == "Darwin":
+        return f"macOS {platform.mac_ver()[0]}"
+    if IS_WIN:
+        return f"Windows {platform.release()}（{platform.version()}）"
+    return f"{platform.system()} {platform.release()}"
+
+
 NOWIN = 0x08000000 if IS_WIN else 0     # Windows：子进程不弹黑色控制台窗口
 
 
@@ -101,6 +114,7 @@ class Api:
         self.job = None
         self.lock = threading.Lock()
         self.dl = {"state": "idle", "pct": 0, "msg": ""}
+        self.last_status = None
 
     # ----- 基础 -----
     def env(self):
@@ -183,7 +197,9 @@ class Api:
     def status(self, serial):
         out, err, rc = self._run("run.py", "-s", serial, "status-json", timeout=90)
         try:
-            return json.loads(out.strip().splitlines()[-1])
+            st = json.loads(out.strip().splitlines()[-1])
+            self.last_status = st
+            return st
         except Exception:
             return {"error": (err or out)[-600:]}
 
@@ -302,6 +318,52 @@ class Api:
         else:
             return "未知的还原项"
         return out + err
+
+    # ----- 反馈 -----
+    def diagnostics(self):
+        """反馈附带的诊断信息。序列号替换成 <序列号>；不含应用列表和通知内容。"""
+        lines = [f"- 客户端：{APP_NAME} {VERSION}（{'打包版' if FROZEN else '源码'}）",
+                 f"- 电脑：{os_name()}（{platform.machine()}）"]
+        try:
+            v = self._adb("version", timeout=8).splitlines()[0] if self.adb else "没有 adb"
+        except Exception as e:
+            v = f"adb 出错：{e}"
+        lines.append(f"- adb：{v}")
+        st, serial = self.last_status, (self.job or {}).get("serial")
+        if st and "info" in st:
+            i = st["info"]
+            nm = i.get("name") or i.get("model")
+            if not nm.upper().startswith((i.get("brand") or "").upper()):
+                nm = f"{i.get('brand')} {nm}"
+            lines += [f"- 手机：{nm}（{i.get('model')}）",
+                      f"- 系统：{i.get('build')}，Android {i.get('android')}",
+                      f"- 机型脚本：{st.get('recipe') or '无'}"
+                      + (f"（录制版本 {st.get('recipe_build')}，{'一致' if st.get('recipe_ok') else '不一致'}）" if st.get('recipe') else ""),
+                      f"- 折叠屏展开：{'是' if st.get('fold_open') else '否'}；锁屏：{'是' if st.get('locked') else '否'}"]
+        else:
+            lines.append("- 手机：还没检测")
+        j = self.job
+        if j:
+            lines.append("\n**执行结果**\n")
+            for r in j["results"]:
+                lines.append(f"- {r['title']}：{'成功' if r['rc'] == 0 else '失败（退出码 %s）' % r['rc']}，{r['sec']} 秒")
+            tail = [l for l in j["lines"] if l.strip()][-60:]
+            log = "\n".join(tail)
+            if serial:
+                log = log.replace(serial, "<序列号>")
+            lines.append("\n<details><summary>最近的日志</summary>\n\n```text\n" + log + "\n```\n</details>")
+        return "\n".join(lines)
+
+    def copy_text(self, text):
+        try:
+            if IS_WIN:
+                subprocess.run(["powershell", "-NoProfile", "-Command", "$input | Set-Clipboard"], input=text,
+                               text=True, encoding="utf-8", creationflags=NOWIN, timeout=10)
+            else:
+                subprocess.run(["pbcopy"], input=text, text=True, encoding="utf-8", timeout=10)
+            return True
+        except Exception:
+            return False
 
     def open_path(self, which):
         path = {"data": DATA, "backups": BACKUPS}.get(which, DATA)

@@ -2,6 +2,7 @@
 用法：python gui/smoke_test.py <打包后的可执行文件>"""
 import subprocess, sys
 
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 exe = sys.argv[1]
 ok = True
 for args, expect in ((["run.py", "--help"], "run.py"), (["run.py", "devices"], None)):
