@@ -82,7 +82,9 @@ def child_env(adb):
 
 def cmd_for(script, *args):
     if FROZEN:
-        return [sys.executable, "--cli", script, *args]
+        cli = os.path.join(os.path.dirname(sys.executable), "aac-cli.exe")
+        exe = cli if IS_WIN and os.path.exists(cli) else sys.executable     # Windows 用命令行版，输出不丢
+        return [exe, "--cli", script, *args]
     return [sys.executable, "-u", os.path.join(TOOL, script), *args]
 
 
