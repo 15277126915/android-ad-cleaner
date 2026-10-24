@@ -15,12 +15,13 @@
   python3 tool/run.py -s 序列号 quickapp on       恢复快应用
   python3 tool/run.py -s 序列号 finish             收尾：插电常亮改回备份时的值，提醒关闭开发者模式
   python3 tool/run.py -s 序列号 dev-off --yes      从电脑上关闭开发者模式和 USB 调试（执行后电脑与手机断开）
+  python3 tool/run.py -s 序列号 status-json        只读：一次输出全部状态（JSON，给图形界面用）
 """
 import datetime, glob, os, re, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tool")
-BACKUPS = os.path.join(ROOT, "backups")
+BACKUPS = os.environ.get("AAC_BACKUPS") or os.path.join(ROOT, "backups")
 
 # 各品牌常见的系统广告包（快应用另列在 QUICKAPP）。只在机主同意后挂起；挂起可一条命令还原。
 AD_PKGS = {
@@ -127,6 +128,15 @@ def quickapps(serial):
             "used": fg,
         })
     return out
+
+
+def fold_open(serial):
+    """折叠屏展开时屏幕接近正方形：引擎会找错位置，要合上用外屏。"""
+    m = re.search(r"(\d+)x(\d+)", sh(serial, "wm size").splitlines()[-1] if sh(serial, "wm size") else "")
+    if not m:
+        return False
+    w, h = int(m.group(1)), int(m.group(2))
+    return min(w, h) / max(w, h) > 0.8
 
 
 def record(serial, pkgs, fn="suspended.txt"):
@@ -293,6 +303,26 @@ def main():
         on = sh(s, "settings get global development_settings_enabled") == "1"
         if on:
             print(DEV_REMINDER.format(s=s))
+
+    elif cmd == "status-json":
+        import json
+        i = info(s); r = recipe_for(i["model"]); steps, rb, ok = [], "", True
+        if r:
+            src = open(r, encoding="utf-8").read()
+            steps = re.findall(r'^@step\("([^"]+)"\)', src, re.M)
+            m = re.search(r'^BUILD\s*=\s*"([^"]*)"', src, re.M)
+            rb = m.group(1) if m else ""
+            ok = i["build"].startswith(rb)
+        ads = [{"pkg": p, "suspended": suspended(s, p)} for p in AD_PKGS.get(i["brand"], []) if installed(s, p)]
+        print(json.dumps({
+            "info": i, "locked": locked(s),
+            "recipe": os.path.relpath(r, ROOT) if r else None, "recipe_build": rb, "recipe_ok": ok, "steps": steps,
+            "ads": ads, "quickapps": quickapps(s),
+            "stay_on": sh(s, "settings get global stay_on_while_plugged_in"),
+            "dev": sh(s, "settings get global development_settings_enabled") == "1",
+            "backup": os.path.relpath(latest_backup(s), BACKUPS) if glob.glob(os.path.join(BACKUPS, f"{i['model']}-*")) else None,
+            "fold_open": fold_open(s),
+        }, ensure_ascii=False))
 
     elif cmd == "dev-off":
         if "--yes" not in rest:

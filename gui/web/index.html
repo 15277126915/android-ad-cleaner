@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安卓去广告</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --side:#eef0f4; --text:#1d1f23; --sub:#6b7280; --line:#e3e6eb;
+  --accent:#2f6fec; --accent-weak:#e8effd; --ok:#1f9d55; --ok-weak:#e6f6ec; --warn:#c77700; --warn-weak:#fdf3e1;
+  --bad:#d93838; --bad-weak:#fdeaea; --mono:"SF Mono",Menlo,Consolas,monospace; --log:#0f1115; --logtext:#d7dae0;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#16181c; --panel:#1e2126; --side:#1a1c20; --text:#e8eaed; --sub:#9aa0a8; --line:#2c3036;
+  --accent:#5b8ff9; --accent-weak:#1f2a40; --ok:#3fbf73; --ok-weak:#18301f; --warn:#e3a33b; --warn-weak:#33280f;
+  --bad:#f06b6b; --bad-weak:#3a1c1c; --log:#0b0c0f;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;}
+.app{display:grid;grid-template-columns:220px 1fr;height:100vh}
+aside{background:var(--side);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:4px}
+.brand{font-weight:700;font-size:17px;padding:0 10px 18px;display:flex;align-items:center;gap:8px}
+.brand i{width:26px;height:26px;border-radius:7px;background:var(--accent);display:inline-grid;place-items:center;color:#fff;font-style:normal;font-size:14px}
+.step{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--sub);cursor:default}
+.step b{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:600}
+.step.on{background:var(--panel);color:var(--text);font-weight:600}
+.step.on b{border-color:var(--accent);background:var(--accent);color:#fff}
+.step.done b{border-color:var(--ok);background:var(--ok);color:#fff}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:2px}
+.link{background:none;border:0;color:var(--sub);text-align:left;padding:7px 10px;border-radius:7px;cursor:pointer;font:inherit}
+.link:hover{background:var(--panel);color:var(--text)}
+.ver{color:var(--sub);font-size:12px;padding:6px 10px}
+main{overflow:auto;padding:30px 36px 40px}
+h1{font-size:22px;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15px}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.kv{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kv small{color:var(--sub);display:block;font-size:12px}
+.kv span{font-weight:600}
+.btn{border:0;border-radius:8px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:var(--accent-weak);color:var(--accent)}
+.btn.plain{background:transparent;border:1px solid var(--line);color:var(--text)}
+.btn.danger{background:var(--bad)}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.tag.ok{background:var(--ok-weak);color:var(--ok)} .tag.warn{background:var(--warn-weak);color:var(--warn)}
+.tag.bad{background:var(--bad-weak);color:var(--bad)} .tag.info{background:var(--accent-weak);color:var(--accent)}
+.note{border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.note.warn{background:var(--warn-weak);color:var(--warn)} .note.bad{background:var(--bad-weak);color:var(--bad)}
+.note.info{background:var(--accent-weak);color:var(--accent)} .note.ok{background:var(--ok-weak);color:var(--ok)}
+.dev{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:var(--panel)}
+.dev .ico{width:38px;height:38px;border-radius:9px;background:var(--accent-weak);display:grid;place-items:center;font-size:20px}
+.dev .meta{flex:1} .dev .meta small{color:var(--sub);display:block}
+.tut{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.tut figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tut img{width:100%;height:260px;object-fit:contain;display:block;background:#fff}
+.tut figcaption{padding:8px 12px;font-size:13px}
+details summary{cursor:pointer;font-weight:600}
+label.chk{display:flex;align-items:flex-start;gap:10px;padding:8px 0;cursor:pointer}
+label.chk input{margin-top:4px;width:16px;height:16px;accent-color:var(--accent)}
+label.chk small{color:var(--sub);display:block}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 12px 4px 8px;cursor:pointer;user-select:none}
+.chip input{accent-color:var(--accent)}
+.chan{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px}
+.chan table{width:100%;border-collapse:collapse;font-size:13px}
+.chan td{padding:6px 10px;border-bottom:1px solid var(--line)}
+.chan td.pkg{color:var(--sub);font-family:var(--mono);font-size:12px}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.log{background:var(--log);color:var(--logtext);font-family:var(--mono);font-size:12px;border-radius:10px;padding:14px;height:340px;overflow:auto;white-space:pre-wrap;margin-top:14px}
+.res{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.res:last-child{border:0}
+.res .t{flex:1;font-weight:600} .res .d{color:var(--sub);font-size:13px}
+.spin{width:18px;height:18px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes s{to{transform:rotate(360deg)}}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;place-items:center;z-index:9}
+.modal.show{display:grid}
+.modal .box{background:var(--panel);border-radius:14px;padding:22px 24px;width:min(460px,90vw);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal h3{margin:0 0 8px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><i>净</i>安卓去广告</div>
+    <div class="step" data-s="1"><b>1</b>连接手机</div>
+    <div class="step" data-s="2"><b>2</b>检测</div>
+    <div class="step" data-s="3"><b>3</b>选择要关的</div>
+    <div class="step" data-s="4"><b>4</b>执行</div>
+    <div class="step" data-s="5"><b>5</b>完成</div>
+    <div class="side-foot">
+      <button class="link" onclick="openRestore()">↺ 还原改动</button>
+      <button class="link" onclick="api.open_path('backups')">📁 打开备份文件夹</button>
+      <button class="link" onclick="api.open_url('https://github.com/rddmwmddr/android-ad-cleaner')">？使用说明</button>
+      <div class="ver" id="ver"></div>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<div class="modal" id="modal"><div class="box" id="modalbox"></div></div>
+
+<script>
+let api, ENV = {}, S = {step: 1, serial: null, dev: null, status: null, chans: null, plan: null, logNext: 0};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const main = () => $("#main");
+
+function setStep(n){
+  S.step = n;
+  document.querySelectorAll(".step").forEach(e => {
+    const k = +e.dataset.s; e.classList.toggle("on", k === n); e.classList.toggle("done", k < n);
+  });
+}
+function modal(html){ $("#modalbox").innerHTML = html; $("#modal").classList.add("show"); }
+function closeModal(){ $("#modal").classList.remove("show"); }
+
+window.addEventListener("pywebviewready", async () => {
+  api = window.pywebview.api;
+  ENV = await api.env();
+  $("#ver").textContent = "版本 " + ENV.version;
+  showConnect();
+});
+
+/* ---------- 1 连接 ---------- */
+const TUT = [
+  ["dev-1-about.png", "① 设置 → 关于本机 → 版本信息（小米：我的设备 → 全部参数；vivo：系统管理与升级 → 版本信息）"],
+  ["dev-2-version.png", "② 连点「版本号」7 次，输入锁屏密码，提示「已处于开发者模式」"],
+  ["dev-3-search.png", "③ 设置顶部搜索「开发者选项」，点进去"],
+  ["dev-4-on.png", "④ 确认最上方的总开关是开着的"],
+  ["dev-5-usb.png", "⑤ 打开「USB 调试」。小米还要打开「USB 调试（安全设置）」"],
+];
+let pollDev = null;
+function showConnect(){
+  setStep(1); clearInterval(pollDev);
+  main().innerHTML = `
+    <h1>连接手机</h1>
+    <p class="lead">用数据线把手机连到这台电脑。手机要打开开发者模式和 USB 调试。</p>
+    <div id="adbbox"></div>
+    <div id="devbox"></div>
+    <details class="card" id="tutbox">
+      <summary>还没打开 USB 调试？看图文教程</summary>
+      <div class="tut" style="margin-top:14px">${TUT.map(([f,c]) => `<figure><img src="img/${f}" alt=""><figcaption>${c}</figcaption></figure>`).join("")}</div>
+      <p class="lead" style="margin:14px 0 0">插线后：手机下拉通知栏，USB 用途选「传输文件」；弹出「允许 USB 调试吗？」时勾「始终允许」，点「允许」。</p>
+    </details>`;
+  if (!ENV.adb){ renderAdb(); return; }
+  refreshDevices(); pollDev = setInterval(refreshDevices, 2000);
+}
+function renderAdb(){
+  $("#adbbox").innerHTML = `<div class="card"><h3>第一次使用：需要 adb 工具</h3>
+    <p class="lead" style="margin:0 0 12px">adb 是 Google 官方的安卓调试工具，用来和手机通信。点下面的按钮从 Google 官网下载（约 10 MB），下载即表示同意 Android SDK 平台工具的使用条款。</p>
+    <div class="row"><button class="btn" id="dlbtn" onclick="dlAdb()">下载 adb</button><span id="dlmsg" class="lead" style="margin:0"></span></div>
+    <div class="bar hide" id="dlbar" style="margin-top:12px"><i style="width:0"></i></div></div>`;
+}
+async function dlAdb(){
+  $("#dlbtn").disabled = true; $("#dlbar").classList.remove("hide");
+  await api.download_adb();
+  const t = setInterval(async () => {
+    const d = await api.download_state();
+    $("#dlmsg").textContent = d.msg; $("#dlbar i").style.width = d.pct + "%";
+    if (d.state === "done"){ clearInterval(t); ENV = await api.env(); showConnect(); }
+    if (d.state === "error"){ clearInterval(t); $("#dlbtn").disabled = false; }
+  }, 400);
+}
+async function refreshDevices(){
+  if (S.step !== 1) return;
+  const r = await api.devices();
+  const box = $("#devbox"); if (!box) return;
+  if (r.error && r.error !== "no-adb"){ box.innerHTML = `<div class="note bad">${esc(r.error)}</div>`; return; }
+  if (!r.list.length){
+    box.innerHTML = `<div class="card"><div class="row"><span class="spin"></span><span>正在等待手机……插上数据线后这里会出现你的手机。</span></div></div>`;
+    $("#tutbox").open = true; return;
+  }
+  box.innerHTML = r.list.map(d => {
+    let tag, btn = "";
+    if (d.state === "device"){ tag = `<span class="tag ok">已连接</span>`; btn = `<button class="btn" onclick='pick(${JSON.stringify(d)})'>用这台</button>`; }
+    else if (d.state === "unauthorized") tag = `<span class="tag warn">等待授权</span> <small>请在手机弹窗上勾「始终允许」，点「允许」</small>`;
+    else tag = `<span class="tag bad">${esc(d.state)}</span> <small>重新插拔数据线</small>`;
+    return `<div class="dev"><div class="ico">📱</div><div class="meta"><b>${esc(d.name || (d.brand + " " + d.model) || d.serial)}</b><small>${esc(d.model)} · ${esc(d.serial)}</small><div style="margin-top:4px">${tag}</div></div>${btn}</div>`;
+  }).join("");
+}
+function pick(d){ clearInterval(pollDev); S.serial = d.serial; S.dev = d; S.chans = null; showDetect(); }
+
+/* ---------- 2 检测 ---------- */
+async function showDetect(){
+  setStep(2);
+  main().innerHTML = `<h1>检测</h1><p class="lead">读取这台手机的型号、系统版本和广告组件状态。只读，不改任何东西。</p>
+    <div class="card"><div class="row"><span class="spin"></span>正在检测……</div></div>`;
+  const st = await api.status(S.serial);
+  if (st.error){ main().innerHTML += `<div class="note bad">检测失败：${esc(st.error)}</div><div class="actions"><button class="btn plain" onclick="showConnect()">返回</button></div>`; return; }
+  S.status = st;
+  const i = st.info, name = i.name || (i.brand + " " + i.model);
+  const qa = st.quickapps, qaOff = qa.filter(q => q.suspended).length;
+  const warns = [];
+  if (st.locked) warns.push(`<div class="note warn">手机锁屏了。请解锁手机并保持亮屏，然后点「重新检测」。</div>`);
+  if (st.fold_open) warns.push(`<div class="note warn">这是展开的折叠屏。展开后是左右分栏，自动操作会找错位置。请合上手机用外屏，然后点「重新检测」。</div>`);
+  main().innerHTML = `<h1>检测</h1><p class="lead">只读检测完成。</p>${warns.join("")}
+    <div class="grid">
+      <div class="kv"><small>手机</small><span>${esc(name)}</span></div>
+      <div class="kv"><small>型号 / 系统</small><span>${esc(i.model)}</span> · ${esc(i.build)}</div>
+      <div class="kv"><small>机型脚本</small>${st.recipe ? (st.recipe_ok ? `<span class="tag ok">有，版本一致</span>` : `<span class="tag warn">有，系统版本不同</span>`) : `<span class="tag info">还没有</span>`}</div>
+      <div class="kv"><small>快应用</small>${qa.length ? `<span>${qa.length} 个组件</span> ${qaOff === qa.length ? `<span class="tag ok">已关闭</span>` : `<span class="tag warn">开着</span>`}` : `<span>没有检测到</span>`}</div>
+      <div class="kv"><small>广告组件</small>${st.ads.length ? `<span>${st.ads.length} 个</span> ${st.ads.every(a => a.suspended) ? `<span class="tag ok">已挂起</span>` : `<span class="tag warn">在运行</span>`}` : `<span>没有已知的</span>`}</div>
+      <div class="kv"><small>开发者模式</small><span>开着</span></div>
+    </div>
+    ${st.recipe ? "" : `<div class="note info" style="margin-top:14px">这个机型还没有机型脚本：营销通知、快应用、广告组件可以自动处理；各 App 里的广告开关要照<a href="#" onclick="api.open_url('https://github.com/rddmwmddr/android-ad-cleaner/tree/main/docs/清单');return false">清单</a>手动关。</div>`}
+    ${st.recipe && !st.recipe_ok ? `<div class="note warn" style="margin-top:14px">机型脚本是按 ${esc(st.recipe_build)} 录的，这台是 ${esc(i.build)}。部分步骤可能找不到入口，找不到会跳过，不会乱点。</div>` : ""}
+    <div class="actions"><button class="btn plain" onclick="showConnect()">换一台</button><button class="btn plain" onclick="showDetect()">重新检测</button>
+    <button class="btn" ${st.locked || st.fold_open ? "disabled" : ""} onclick="showChoose()">下一步</button></div>`;
+}
+
+/* ---------- 3 选择 ---------- */
+async function showChoose(){
+  setStep(3);
+  const st = S.status;
+  const qaOn = st.quickapps.filter(q => !q.suspended), adsOn = st.ads.filter(a => !a.suspended);
+  main().innerHTML = `<h1>选择要关的</h1><p class="lead">开始前会存一份改动前的快照，每一项都能在「还原改动」里恢复。</p>
+    <div class="card"><h3>各 App 里的广告开关</h3>${st.steps.length ? `
+      <label class="chk"><input type="checkbox" id="c-recipe" checked onchange="document.querySelectorAll('.stp').forEach(x=>x.checked=this.checked)"><span>按机型脚本自动关<small>系统广告、负一屏、搜索、商店、浏览器、主题等 App 里的推荐和广告开关</small></span></label>
+      <div class="chips">${st.steps.map(s => `<label class="chip"><input type="checkbox" class="stp" value="${esc(s)}" checked>${esc(s)}</label>`).join("")}</div>`
+      : `<p class="lead" style="margin:0">这个机型还没有机型脚本，这一项要照清单手动做。</p>`}</div>
+    <div class="card"><h3>营销通知 <span id="chancount" class="tag info"></span></h3>
+      <p class="lead" style="margin:0">按渠道关，同一个 App 的订单、物流、更新、聊天通知保留。服务类渠道（热点共享、红包助手、直播提醒等）默认不勾。</p>
+      <div id="chanbox"><div class="row" style="margin-top:10px"><span class="spin"></span>正在扫描通知渠道……</div></div></div>
+    <div class="card"><h3>快应用</h3>${qaOn.length ? `
+      <label class="chk"><input type="checkbox" id="c-qa"><span>关闭快应用（${qaOn.map(q => esc(q.name)).join("、")}）
+      <small>广告常用 hap:// 链接把人跳进快应用。关闭后这类跳转会弹「应用无法使用」。${qaOn.some(q => q.used) ? "检测到近期打开过，确认不是你主动在用。" : "近期没打开过，关掉对你没有影响。"}可还原。</small></span></label>`
+      : `<p class="lead" style="margin:0">${st.quickapps.length ? "快应用已经是关闭状态。" : "没有检测到快应用组件。"}</p>`}</div>
+    <div class="card"><h3>系统广告组件</h3>${adsOn.length ? adsOn.map(a => `
+      <label class="chk"><input type="checkbox" class="c-ad" value="${esc(a.pkg)}"><span>挂起 <code>${esc(a.pkg)}</code><small>${adName(a.pkg)}。挂起只是暂停运行，可还原，不影响系统更新。</small></span></label>`).join("")
+      : `<p class="lead" style="margin:0">${st.ads.length ? "已经挂起。" : "没有已知的广告组件。"}</p>`}</div>
+    <div class="note info">执行期间请保持手机亮屏、解锁、插着线，不要碰手机。</div>
+    <div class="actions"><button class="btn plain" onclick="showDetect()">上一步</button><button class="btn" onclick="go()">开始执行</button></div>`;
+  if (!S.chans) S.chans = await api.chan_scan(S.serial);
+  renderChans();
+}
+function adName(p){
+  return {"com.opos.ads":"OPPO 广告服务","com.heytap.pictorial":"OPPO 乐划锁屏（锁屏杂志）","com.miui.systemAdSolution":"小米系统广告组件，负责各系统 App 的开屏广告"}[p] || "系统广告组件";
+}
+function renderChans(){
+  const box = $("#chanbox"); if (!box) return;
+  if (!S.chans.length){ box.innerHTML = `<p class="lead" style="margin:10px 0 0">没有开着的营销通知渠道。</p>`; $("#chancount").textContent = ""; return; }
+  box.innerHTML = `<div class="row" style="margin-top:10px"><button class="btn plain" onclick="chAll(true)">全选</button><button class="btn plain" onclick="chAll(false)">全不选</button></div>
+    <div class="chan"><table>${S.chans.map((c, k) => `<tr><td style="width:28px"><input type="checkbox" class="ch" data-k="${k}" ${c.checked ? "checked" : ""} onchange="S.chans[${k}].checked=this.checked;chCount()"></td><td>${esc(c.name)}</td><td class="pkg">${esc(c.pkg)}</td></tr>`).join("")}</table></div>`;
+  chCount();
+}
+function chAll(v){ S.chans.forEach(c => c.checked = v); renderChans(); }
+function chCount(){ $("#chancount").textContent = `已选 ${S.chans.filter(c => c.checked).length} / ${S.chans.length}`; }
+
+/* ---------- 4 执行 ---------- */
+let pollJob = null;
+async function go(){
+  const steps = [...document.querySelectorAll(".stp:checked")].map(x => x.value);
+  const plan = {
+    backup: true, model: S.status.info.model,
+    steps: ($("#c-recipe") && $("#c-recipe").checked) ? steps : [],
+    channels: (S.chans || []).filter(c => c.checked),
+    quickapp: !!($("#c-qa") && $("#c-qa").checked),
+    ads: [...document.querySelectorAll(".c-ad:checked")].map(x => x.value),
+  };
+  const r = await api.start(S.serial, plan);
+  if (r.error){ modal(`<h3>没法开始</h3><p>${esc(r.error)}</p><div class="actions"><button class="btn" onclick="closeModal()">好</button></div>`); return; }
+  S.plan = plan; S.logNext = 0; showRun();
+}
+function showRun(){
+  setStep(4);
+  main().innerHTML = `<h1>执行</h1><p class="lead">请不要碰手机。脚本在手机上点按，你一碰就会乱。</p>
+    <div class="card"><div class="row" style="justify-content:space-between"><b id="jt">准备中……</b><span id="js" class="lead" style="margin:0"></span></div>
+    <div class="bar" style="margin-top:10px"><i id="jb" style="width:0"></i></div>
+    <div class="log" id="log"></div>
+    <div class="actions"><button class="btn plain" id="stopbtn" onclick="api.stop()">停止</button></div></div>`;
+  pollJob = setInterval(tick, 500);
+}
+async function tick(){
+  const r = await api.poll(S.logNext);
+  S.logNext = r.next;
+  const log = $("#log");
+  if (log && r.lines.length){ log.textContent += r.lines.join("\n") + "\n"; log.scrollTop = log.scrollHeight; }
+  if ($("#jt")){ $("#jt").textContent = r.title ? `第 ${r.idx} / ${r.total} 步：${r.title}` : "准备中……";
+    $("#js").textContent = `已用 ${r.sec} 秒`; $("#jb").style.width = (r.total ? (r.idx - (r.running ? 0.5 : 0)) / r.total * 100 : 0) + "%"; }
+  if (!r.running && r.results && r.results.length){ clearInterval(pollJob); showDone(r); }
+}
+
+/* ---------- 5 完成 ---------- */
+function summarize(res){
+  const t = res.tail.join("\n");
+  let m;
+  if ((m = t.match(/机型脚本跑完：关了 (\d+) 个，(\d+) 秒/))) return `关了 ${m[1]} 个开关`;
+  if ((m = t.match(/拨了 (\d+) 个/))){ const left = (t.match(/仍开着: (\d+) 个/) || [])[1]; return `关了 ${m[1]} 个渠道` + (left !== undefined ? `，复查仍开着 ${left} 个` : ""); }
+  if (/快应用已关闭/.test(t)) return `${(t.match(/已挂起/g) || []).length} 个组件已挂起`;
+  if (/快照已存/.test(t)) return "已保存";
+  if ((m = t.match(/插电常亮已改回 (\d+)/))) return `插电常亮已改回 ${m[1]}`;
+  return res.tail.filter(Boolean).slice(-1)[0] || "";
+}
+function showDone(r){
+  setStep(5);
+  const ok = r.results.every(x => x.rc === 0) && !r.cancel;
+  main().innerHTML = `<h1>${ok ? "完成" : "已结束（有步骤没成功）"}</h1><p class="lead">用时 ${r.sec} 秒。去下拉搜索、负一屏、应用商店、浏览器看一眼，确认功能正常。</p>
+    <div class="card">${r.results.map(x => `<div class="res"><span class="tag ${x.rc === 0 ? "ok" : "bad"}">${x.rc === 0 ? "成功" : "失败"}</span><span class="t">${esc(x.title)}</span><span class="d">${esc(summarize(x))} · ${x.sec} 秒</span></div>`).join("")}</div>
+    <div class="card"><h3>最后一步：关闭开发者模式</h3>
+      <p class="lead" style="margin:0 0 12px">开发者模式和 USB 调试用不到了，建议关掉：部分银行、支付、游戏 App 检测到它开着会提醒或拒绝运行；关掉后别人拿你的手机插电脑也连不上。<br>关掉<b>不会撤销</b>这次的改动。</p>
+      <div class="row"><button class="btn" onclick="askDevOff()">帮我关闭</button><button class="btn plain" onclick="selfOff()">我在手机上自己关</button></div></div>
+    <details class="card"><summary>查看完整日志</summary><div class="log" style="height:260px">${esc(document.querySelector("#log")?.textContent || "")}</div></details>`;
+}
+function askDevOff(){
+  modal(`<h3>关闭开发者模式？</h3><p class="lead">关闭后电脑会和手机断开，这是正常的。以后要还原改动，在手机上重新打开开发者模式即可。</p>
+    <div class="actions"><button class="btn plain" onclick="closeModal()">取消</button><button class="btn" onclick="devOff()">关闭</button></div>`);
+}
+async function devOff(){
+  closeModal(); await api.dev_off(S.serial);
+  modal(`<h3>已关闭</h3><p class="lead">请在手机上打开 设置 → 搜索「开发者选项」，确认总开关是关着的。</p><div class="actions"><button class="btn" onclick="closeModal();showConnect()">好</button></div>`);
+}
+function selfOff(){
+  modal(`<h3>在手机上关闭</h3><p class="lead">设置 → 顶部搜索「开发者选项」→ 关掉页面最上方的总开关。</p><div class="actions"><button class="btn" onclick="closeModal()">好</button></div>`);
+}
+
+/* ---------- 还原 ---------- */
+function openRestore(){
+  if (!S.serial){ modal(`<h3>先连接手机</h3><p class="lead">还原要连着手机操作。请先在「连接手机」里选中要还原的手机。</p><div class="actions"><button class="btn" onclick="closeModal()">好</button></div>`); return; }
+  modal(`<h3>还原改动</h3><p class="lead">选一项恢复。App 内的开关要按清单路径手动打开。</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0">
+      <button class="btn ghost" onclick="restore('quickapp')">恢复快应用</button>
+      <button class="btn ghost" onclick="restore('suspend')">恢复挂起的广告组件</button>
+      <button class="btn ghost" onclick="restore('channels')">重新打开关掉的营销通知</button></div>
+    <div id="rmsg" class="lead" style="white-space:pre-wrap;font-size:12px"></div>
+    <div class="actions"><button class="btn plain" onclick="closeModal()">关闭</button></div>`);
+}
+async function restore(w){ $("#rmsg").textContent = "处理中……"; $("#rmsg").textContent = await api.restore(S.serial, w); }
+</script>
+</body>
+</html>

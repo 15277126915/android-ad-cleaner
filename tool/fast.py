@@ -424,11 +424,16 @@ def main():
         exec(src, g)
         print(f"\n机型脚本跑完：关了 {len(p.changed)} 个，{time.time()-t:.0f} 秒")
         import json, datetime
-        log = rest[0].rsplit("/", 1)[0] + "/run-log.txt" if "/" in rest[0] else "run-log.txt"
-        with open(log, "a", encoding="utf-8") as f:
-            f.write(f"\n# {datetime.datetime.now():%Y-%m-%d %H:%M} {' '.join(rest[1:]) or '全跑'}  {time.time()-t:.0f}s\n")
-            for pg, tt in p.changed:
-                f.write(f"{pg}\t{tt}\n")
+        import os
+        logdir = os.environ.get("AAC_BACKUPS") or os.path.dirname(os.path.abspath(rest[0]))
+        try:
+            os.makedirs(logdir, exist_ok=True)
+            with open(os.path.join(logdir, "run-log.txt"), "a", encoding="utf-8") as f:
+                f.write(f"\n# {datetime.datetime.now():%Y-%m-%d %H:%M} {' '.join(rest[1:]) or '全跑'}  {time.time()-t:.0f}s\n")
+                for pg, tt in p.changed:
+                    f.write(f"{pg}\t{tt}\n")
+        except OSError:
+            pass
     else:
         print(__doc__)
 
