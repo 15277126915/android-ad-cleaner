@@ -96,7 +96,7 @@
 
 `com.miui.systemAdSolution` 负责天气、日历、商店等系统 App 里的开屏和内置广告。
 
-当前源码的客户端和 `run.py -s S suspend com.miui.systemAdSolution` 会挂起它并尝试禁止联网；0.2.0 安装包尚未包含断网处理，见[更新记录](../../CHANGELOG.md)。下面是手动命令：
+0.2.1 客户端和 `run.py -s S suspend com.miui.systemAdSolution` 会挂起它，并在系统提供接口时尝试禁止联网，回读包规则和防火墙状态。Android 13 等旧系统可能没有这些命令，此时明确显示「部分完成」并返回失败：挂起保留，广告仍可能出现。0.2.0 不含断网处理，见[更新记录](../../CHANGELOG.md)。下面的手动命令仅适用于 `cmd connectivity help` 列出对应接口的系统：
 
 ```bash
 adb -s S shell pm suspend --user 0 com.miui.systemAdSolution
@@ -106,7 +106,7 @@ adb -s S shell cmd connectivity set-chain3-enabled true
 
 - ⚠️ 只挂起拦不住：系统 App 启动时会把它拉起来，所以加了断网。
 - ⚠️ 断网规则重启后可能失效，重启后重跑后两行。
-- 实测：商店、浏览器、主题、天气正常打开，内容正常加载。
+- Xiaomi 18 Pro Max 实测：商店、浏览器、主题、天气正常打开，内容正常加载；不代表所有小米系统提供该接口。
 
 还原：
 
@@ -118,6 +118,8 @@ adb -s S shell cmd connectivity set-package-networking-enabled true com.miui.sys
 ---
 
 ## 小米的坑
+
+**小米 10（umi，Android 13 / OS1.0.7.0）**：[Issue #21](https://github.com/rddmwmddr/android-ad-cleaner/issues/21) 提供了旧版路径。浏览器顶部设置图标可能没有 `clickable` 标记；脚本只在工具栏识别，不点击资讯正文里的「我的」。热榜页面可能同时有「推荐」开关和热搜 / 娱乐 / 话题子页，子页还会横屏；0.2.1 已修正读屏尺寸和遍历，但整段仍待该机复测。天气「用户体验计划」里的「天气视频卡片」「内容推广」可关闭，天气预警保留；天气、日历首次启动的协议由机主决定，脚本不代为同意。
 
 | 现象 | 对策 |
 |---|---|
