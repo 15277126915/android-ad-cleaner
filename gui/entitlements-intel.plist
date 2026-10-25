@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Intel PyObjC/libffi 回调需要可执行内存。仅 allow-jit 在当前构建下仍会卡住。
+         仅赋给主程序，保留 hardened runtime 和库签名校验。
+         https://pyobjc.readthedocs.io/en/latest/notes/codesigning.html -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>

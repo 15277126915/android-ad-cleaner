@@ -38,6 +38,10 @@ echo "架构：$(file "$APP/Contents/MacOS/$NAME" | sed 's/.*: //')"
 
 if [ -n "$SIGN_ID" ]; then
   codesign --force --deep --options runtime --timestamp --sign "$SIGN_ID" "$APP"
+  if [ "$ARCH" = "x86_64" ]; then
+    # PyObjC/libffi 的 Intel 回调桩需要此权限；只签主程序，不给所有嵌套库放宽权限。
+    codesign --force --options runtime --timestamp --entitlements gui/entitlements-intel.plist --sign "$SIGN_ID" "$APP"
+  fi
   codesign --verify --deep --strict "$APP"
   if [ -n "$NOTARY_PROFILE" ]; then          # App 本身先公证并钉上凭证：用户离线打开也能通过检查
     ZIP="gui/build/$ARCH/app.zip"
