@@ -8,16 +8,16 @@
 
 插上手机，点几下按钮。不需要 Python，也不需要 AI 工具。
 
-> **v0.2.1 · 2026-10-25**：修复 Windows 页面超时、打包任务执行、通知结果误报、小米横屏与搜索输入、vivo 清单链接等问题。旧版不会自动更新，请重新下载；升级前无需删除已有备份。完整改动及验证范围见 [更新记录](CHANGELOG.md)。
+> **v0.2.2 · 2026-10-25**：通知扫描和状态复查不再依赖手机读屏服务；新增「检查读屏连接」、完整诊断显示与复制。保留 0.2.1 的 Windows 启动、打包任务、通知校验、小米与 vivo 修复。旧版不会自动更新，请重新下载，已有备份会保留。完整说明见 [更新记录](CHANGELOG.md)。
 
 本轮还处理了 Windows 本地页面超时、荣耀截图越界、通知渠道误操作风险、vivo 快应用与备份问题。各 Issue 的处理范围和待验证项见 [社区问题处理记录](docs/09-社区问题处理.md)。仅支持通过 adb 连接的安卓设备，暂不支持使用 HDC 的原生鸿蒙。
 
 | 电脑 | 下载 | 说明 |
 |---|---|---|
-| Mac · Apple 芯片（M1 及以后） | [AndroidAdCleaner-0.2.1-mac-arm64.dmg](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.1/AndroidAdCleaner-0.2.1-mac-arm64.dmg) | 已签名、通过苹果公证，双击就能打开 |
-| Mac · Intel 芯片 | [AndroidAdCleaner-0.2.1-mac-intel.dmg](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.1/AndroidAdCleaner-0.2.1-mac-intel.dmg) | 同上 |
-| Windows 10 / 11 · 安装版 | [AndroidAdCleaner-0.2.1-windows-setup.exe](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.1/AndroidAdCleaner-0.2.1-windows-setup.exe) | 弹「Windows 已保护你的电脑」时点「更多信息」→「仍要运行」 |
-| Windows 10 / 11 · 免安装 | [AndroidAdCleaner-0.2.1-windows-portable.zip](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.1/AndroidAdCleaner-0.2.1-windows-portable.zip) | 解压后双击 `AndroidAdCleaner.exe` |
+| Mac · Apple 芯片（M1 及以后） | [AndroidAdCleaner-0.2.2-mac-arm64.dmg](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.2/AndroidAdCleaner-0.2.2-mac-arm64.dmg) | 已签名、通过苹果公证，双击就能打开 |
+| Mac · Intel 芯片 | [AndroidAdCleaner-0.2.2-mac-intel.dmg](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.2/AndroidAdCleaner-0.2.2-mac-intel.dmg) | 同上 |
+| Windows 10 / 11 · 安装版 | [AndroidAdCleaner-0.2.2-windows-setup.exe](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.2/AndroidAdCleaner-0.2.2-windows-setup.exe) | 弹「Windows 已保护你的电脑」时点「更多信息」→「仍要运行」 |
+| Windows 10 / 11 · 免安装 | [AndroidAdCleaner-0.2.2-windows-portable.zip](https://github.com/rddmwmddr/android-ad-cleaner/releases/download/v0.2.2/AndroidAdCleaner-0.2.2-windows-portable.zip) | 解压后双击 `AndroidAdCleaner.exe` |
 
 不知道 Mac 是哪种芯片：左上角苹果图标 → 关于本机，「芯片」写 Apple M 开头的选 Apple 芯片。所有版本：[Releases](https://github.com/rddmwmddr/android-ad-cleaner/releases)。用法：[docs/08-桌面客户端.md](docs/08-桌面客户端.md)。
 
@@ -96,7 +96,7 @@
 | 小米 | 18 Pro Max（M154FF） | HyperOS 4.0.24 | ✅ 10-25 前轮九段通过，新增兼容改动待复测 | ✅ | ✅ |
 | vivo | X300 Ultra（V2547DA） | OriginOS 6 | ⚠️ 脚本已补，整段待真机验证 | ✅ | ✅ |
 
-表格反映 0.2.1 的脚本和验证范围。小米 10、荣耀 Magic7 Pro 等反馈已修复可定位的通用缺陷，但仍需对应真机复测；同品牌参考脚本不等于专用适配，详细记录见 [更新记录](CHANGELOG.md)。
+表格反映当前脚本和验证范围。小米 10、荣耀 Magic7 Pro 等反馈已修复可定位的通用缺陷，但仍需对应真机复测；同品牌参考脚本不等于专用适配，详细记录见 [更新记录](CHANGELOG.md)。
 
 - 可先运行通用检测；通知渠道能否安全关闭取决于系统页面和权限，部分 vivo 页面会被跳过。广告跟踪入口也随品牌变化。
 - 同一个品牌，系统小版本不同，设置页的名字和层级也会变。机型脚本按型号和系统版本存放，版本对不上时引擎会提示，找不到入口的步骤会跳过，不会乱点。
