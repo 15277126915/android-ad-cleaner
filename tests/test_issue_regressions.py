@@ -285,7 +285,7 @@ class DesktopTests(unittest.TestCase):
         app = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(app)
         buffer = io.BytesIO()
-        stream = io.TextIOWrapper(buffer, encoding="ascii")
+        stream = io.TextIOWrapper(buffer, encoding="ascii", newline="\n")
         with patch.object(sys, "stdout", stream), patch.object(sys, "stderr", stream):
             app._fix_stdio()
             print("GUI smoke: 页面通过")
