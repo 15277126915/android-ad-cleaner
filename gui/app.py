@@ -223,7 +223,8 @@ class Api:
             if plan.get("backup", True):
                 tasks.append(("存改动前的快照", "run.py", ["-s", serial, "backup"]))
             if plan.get("steps"):
-                tasks.append(("关闭各 App 里的广告开关", "run.py", ["-s", serial, "recipe", *plan["steps"]]))
+                tasks.append(("关闭各 App 里的广告开关", "run.py",
+                              ["-s", serial, "recipe", *plan["steps"], *(["--ref"] if plan.get("ref") else [])]))
             if plan.get("channels"):
                 tasks.append(("关闭营销通知", "@channels", plan["channels"]))
             if plan.get("quickapp"):
@@ -374,8 +375,9 @@ class Api:
             subprocess.Popen(["open", path])
 
     def open_url(self, url):
-        import webbrowser
-        webbrowser.open(url)
+        """网址里的中文先转成 %XX：macOS 经 AppleScript、Windows 经 shell 打开中文网址会出错。"""
+        import webbrowser, urllib.parse
+        webbrowser.open(urllib.parse.quote(url, safe=":/?#[]@!$&'()*+,;=%~"))
 
 
 def main():

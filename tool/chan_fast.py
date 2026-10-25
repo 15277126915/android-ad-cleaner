@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fast import Phone
 
 KW = re.compile(r"营销|活动|推荐|推广|热点|热门|资讯|新闻|福利|优惠|特惠|精选|精彩|运营|促销|红包|直播|种草|内容|头条|猜你|好物|权益|会员|签到|广告|recommend|promo|market|deal|news|topstory|upsell|offer", re.I)
-SKIP = re.compile(r"下载|更新|安装|上传|订单|物流|快递|交易|支付|账号|安全|验证|通话|来电|消息|聊天|私信|评论|互动|提醒|闹钟|日程|天气预警|系统|前台|后台|服务运行|播放|媒体", re.I)
+SKIP = re.compile(r"下载|更新|安装|上传|订单|物流|快递|交易|支付|账号|安全|验证|通话|来电|消息|聊天|私信|评论|互动|提醒|闹钟|日程|天气预警|系统|前台|后台|服务运行|播放|媒体"
+                  r"|热点和网络共享|智能热点|红包助手|盗窃|驾驶状态|权限建议|运营商", re.I)   # 后一行：服务类，不是营销
 
 
 def parse(p):
@@ -53,23 +54,51 @@ def state(d, app_off, pk, cid):
     return "ON"
 
 
+def wait_page(p, name, rounds=12):
+    for _ in range(rounds):
+        tx = [t for t, _, _ in p.texts()]
+        if not name or name in tx:
+            sw = p.switches()
+            if sw:
+                return sw
+        time.sleep(0.2)
+    return None
+
+
+def via_app_page(p, pk, name):
+    """渠道直达不认的系统（vivo 等，Issue #7）：打开 App 的通知页，按渠道名点进渠道页。"""
+    p.d.shell("am start -f 0x10008000 -a android.settings.APP_NOTIFICATION_SETTINGS"
+              f" --es android.provider.extra.APP_PACKAGE {shlex.quote(pk)}")
+    for _ in range(15):
+        if p.find(name, exact=True) or len(p.texts()) > 6:
+            break
+        time.sleep(0.2)
+    p.miss = 0
+    if not p.tap(name, exact=True, scrolls=8):
+        return None
+    for _ in range(12):                       # 等进到渠道页：出现「允许通知」
+        tx = [t for t, _, _ in p.texts()]
+        if any("允许通知" in t for t in tx):
+            return p.switches()
+        time.sleep(0.2)
+    return None
+
+
 def toggle(p, pk, cid, want_on, name=""):
     # -f NEW_TASK|CLEAR_TASK：不加的话荣耀/OPPO 会复用上一个渠道页
     p.d.shell("am start -f 0x10008000 -a android.settings.CHANNEL_NOTIFICATION_SETTINGS"
               f" --es android.provider.extra.APP_PACKAGE {shlex.quote(pk)}"
               f" --es android.provider.extra.CHANNEL_ID {shlex.quote(cid)}")
-    sw = None
-    for _ in range(12):
-        tx = [t for t, _, _ in p.texts()]
-        if (not name or name in tx):
-            sw = p.switches()
-            if sw:
-                break
-        time.sleep(0.2)
+    sw = wait_page(p, name)
+    if not sw and name:
+        sw = via_app_page(p, pk, name)
     if not sw:
         return f"页面不是「{name}」或没开关，跳过"
+    def master(sw):                            # 渠道页的总开关「允许通知」；没有这个标题就取第一个
+        allow = [x for x in sw if "允许通知" in x[0]]
+        return (allow or sw)[0]
     for attempt in range(3):                   # 页面动画没完时点击会被吞：点完读回来，没变就再点
-        t, c, xy = sw[0]                       # 渠道页第一个开关=允许通知
+        t, c, xy = master(sw)
         if c == want_on:
             return None
         time.sleep(0.25 + 0.3 * attempt)
@@ -110,6 +139,8 @@ def main():
         if cmd == "verify":
             print(f"{st:4} {label}")
     print(f"营销渠道仍开着: {bad} 个")
+    if cmd == "off" and bad:
+        sys.exit(1)                  # 让客户端把这一步标成失败（Issue #7：以前失败了也显示成功）
 
 
 if __name__ == "__main__":

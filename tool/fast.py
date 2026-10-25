@@ -10,7 +10,7 @@
   fast.py -s SERIAL run 机型脚本.py         跑一个品牌机型脚本
 在脚本里：from fast import Phone
 """
-import re, sys, time, xml.etree.ElementTree as ET
+import os, re, sys, time, xml.etree.ElementTree as ET
 for _st in (sys.stdout, sys.stderr):
     try:
         _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
@@ -26,6 +26,19 @@ CONFIRM = ("确定", "关闭", "仍要关闭", "确认关闭", "确认", "继续
 def bounds(n):
     m = BOUNDS.match(n.get("bounds", ""))
     return tuple(map(int, m.groups())) if m else (0, 0, 0, 0)
+
+
+# 「防止/限制/阻止广告跟踪」「关闭个性化推荐」这类开关是反着的：打开才是保护。不能当广告开关关掉。
+NEG_PREFIX = re.compile(r"^(防止|限制|阻止|禁止|拒绝|不允许|屏蔽|关闭|停用|不接收|不显示|不推送|停止)")
+AD_WORDS = re.compile(r"广告|跟踪|追踪|推荐|个性化|营销|资讯|热搜|热点|定向|画像")   # 不含「推送」：「关闭推送」会连订单通知一起关
+TRACK_WORDS = re.compile(r"广告|跟踪|追踪")
+
+
+def want_state(title):
+    """这个开关该处在什么状态：False=关（普通广告开关）；True=开（保护类开关）；None=不碰。"""
+    if NEG_PREFIX.search(title or ""):
+        return True if AD_WORDS.search(title) else None
+    return False
 
 
 class Phone:
@@ -62,9 +75,17 @@ class Phone:
             if n.get("package") == "com.android.systemui" and not getattr(self, "sysui", False):
                 continue                      # 状态栏/通知栏文字不算
             t = (n.get("text") or n.get("content-desc") or "").strip()
-            if t:
+            if t and self.on_screen(n):
                 out.append((t, bounds(n), n))
         return out
+
+    def on_screen(self, n):
+        """折叠屏合上时，dump 里还留着内屏那份节点，坐标在外屏之外（Issue #2）；点上去没反应。"""
+        if n.get("visible-to-user") == "false":
+            return False
+        l, t, r, b = bounds(n)
+        cx, cy = (l + r) // 2, (t + b) // 2
+        return 0 <= cx < self.W and 0 <= cy < self.H
 
     def switches(self, root=None):
         """[(标题, checked, (cx,cy))]，标题取开关所在行的第一段文字。"""
@@ -90,26 +111,41 @@ class Phone:
             if not any(k in cls for k in ("Switch", "CheckBox", "ToggleButton", "Compound")) and n.get("clickable") != "true":
                 continue
             l, t, r, b = bounds(n)
-            if r - l <= 0 or b - t <= 0:
+            if r - l <= 0 or b - t <= 0 or not self.on_screen(n):
                 continue
+            cy = (t + b) // 2
             title, p = "", n
             for _ in range(5):
                 p = parent.get(p)
                 if p is None:
                     break
-                tx = [(x.get("text") or "").strip() for x in p.iter("node") if x is not n]
-                tx = [x for x in tx if x and x not in ("开", "关", "已开启", "已关闭")]
-                if tx:
-                    title = tx[0]
-                    break
-            out.append((title, n.get("checked") == "true", ((l + r) // 2, (t + b) // 2)))
-        # 一行有「整行」和「开关」两个 checkable 时，留最靠右的那个
-        best = {}
-        for s in out:
-            k = (s[0], s[2][1] // 40)
-            if k not in best or s[2][0] > best[k][2][0]:
-                best[k] = s
-        return sorted(best.values(), key=lambda s: s[2][1])
+                cand = []
+                for x in p.iter("node"):
+                    tx = (x.get("text") or "").strip()
+                    if x is n or not tx or tx in ("开", "关", "已开启", "已关闭", "开启", "关闭"):
+                        continue
+                    xl, xt, xr, xb = bounds(x)
+                    if xb <= xt:
+                        continue
+                    # 标题要和开关在同一行：取竖直方向离开关中心最近的那段文字（Issue #2：
+                    # 父容器里第一段文字可能是上一行的标题，会把「自动更新」认成「每次联网时通知」）
+                    dist = 0 if xt <= cy <= xb else min(abs(xt - cy), abs(xb - cy))
+                    cand.append((dist, xt, tx))
+                if cand:
+                    cand.sort()
+                    if cand[0][0] <= max(60, (b - t)):
+                        title = cand[0][2]
+                        break
+            out.append((title, n.get("checked") == "true", ((l + r) // 2, cy)))
+        # 同一行有「整行」和「开关」两个 checkable 时，留最靠右的那个
+        rows = []
+        for sw in sorted(out, key=lambda s: s[2][1]):
+            if rows and abs(rows[-1][2][1] - sw[2][1]) < 30:
+                if sw[2][0] > rows[-1][2][0]:
+                    rows[-1] = sw if sw[0] else (rows[-1][0], sw[1], sw[2])
+            else:
+                rows.append(sw)
+        return rows
 
     def locked(self):
         out = self.d.shell("dumpsys window | grep -m1 isKeyguardShowing").output
@@ -306,16 +342,21 @@ class Phone:
             root = self.tree()
             targets = []
             for t, c, xy in self.switches(root):
-                if not c or not t:
+                if not t:
+                    continue
+                want = want_state(t)
+                if want is None or c == want:            # 不碰的，或已经是目标状态
                     continue
                 if any(k in t for k in keep):
                     continue
-                if only is not None and not any(k in t for k in only):
-                    continue
+                if only is not None and not any(k in t for k in only) and not (want and TRACK_WORDS.search(t)):
+                    continue                              # 「限制广告跟踪」这类保护开关：不在名单里也要打开
+                if os.environ.get("AAC_REF") and only is None and not want:
+                    continue                              # 参考脚本（同品牌别的机型录的）：不做整页全关
                 if xy[1] < self.H * 0.08 or xy[1] > self.H * 0.985:
                     continue
-                targets.append((t, xy))
-            for i, (t, xy) in enumerate(targets):
+                targets.append((t, xy, want))
+            for i, (t, xy, _) in enumerate(targets):
                 self.click(*xy)
                 if i == 0 or slow:
                     if self.confirm():
@@ -329,28 +370,75 @@ class Phone:
             if targets:
                 time.sleep(0.25)
                 self.confirm()
-                still = {t for t, c, _ in self.switches() if c}
-                for t, xy in targets:
-                    if t in still:                      # 没点掉的补一次
+
+                def wrong():                            # 还没到目标状态的标题
+                    now = {t: c for t, c, _ in self.switches()}
+                    return {t for t, _, w in targets if now.get(t, w) != w}
+                still = wrong()
+                for t, xy, _ in targets:
+                    if t in still:                      # 没点动的补一次
                         self.click(*xy); self.confirm()
-                still = {t for t, c, _ in self.switches() if c}
-                if still & {t for t, _ in targets}:     # 还有没关上的：等动画结束再点一次
+                still = wrong()
+                if still:                               # 还有没拨过去的：等动画结束再点一次
                     time.sleep(0.8)
-                    for t, xy in targets:
+                    for t, xy, _ in targets:
                         if t in still:
                             self.click(*xy); self.confirm()
                     time.sleep(0.4)
-                    still = {t for t, c, _ in self.switches() if c}
-                for t, _ in targets:
+                    still = wrong()
+                for t, _, w in targets:
                     if t in still:
-                        self.say(f"  ✗ 关不掉 {t}")
+                        self.say(f"  ✗ {'打不开' if w else '关不掉'} {t}")
                     else:
-                        self.say(f"  关 {t}")
+                        self.say(f"  {'开（保护类开关）' if w else '关'} {t}")
                         self.changed.append((page, t))
                         done += 1
             if not self.scroll_more():
                 break
         return done
+
+    def focused_text(self):
+        for n in self.tree().iter("node"):
+            if n.get("focused") == "true" and "EditText" in (n.get("class") or ""):
+                return n.get("text") or ""
+        return None
+
+    def type_text(self, kw, timeout=4.0):
+        """往当前输入框打字。部分机型（小米 HyperOS 设置搜索）用 setText 会卡住、一直打「%」：
+        加超时，打完核对；不对就清掉、改用剪贴板粘贴；还不对就关掉键盘返回 False，不卡住。"""
+        import threading
+        def attempt(fn):
+            box = {}
+            t = threading.Thread(target=lambda: box.setdefault("r", fn()), daemon=True)
+            t.start(); t.join(timeout)
+            if t.is_alive():
+                self.d.shell("input keyevent BACK")          # 收起键盘，打断输入
+                return False
+            time.sleep(0.4)
+            return (self.focused_text() or "").strip() == kw
+        def clear():
+            try:
+                self.d.shell("input keyevent KEYCODE_MOVE_END")
+                self.d.shell("input keyevent " + " ".join(["KEYCODE_DEL"] * 40))
+            except Exception:
+                pass
+        def set_text():
+            for sel in (dict(className="android.widget.EditText", focused=True), dict(className="android.widget.EditText")):
+                el = self.d(**sel)
+                if el.exists:                  # 别用 d(focused=True)：键盘窗口也有 focused 节点，会打到键盘上
+                    return el.set_text(kw)
+            return self.d(focused=True).set_text(kw)
+        if attempt(set_text):
+            return True
+        clear()
+        def paste():
+            self.d.set_clipboard(kw)
+            self.d.shell("input keyevent KEYCODE_PASTE")
+        if attempt(paste):
+            return True
+        clear()
+        self.d.shell("input keyevent BACK")
+        return False
 
     def setting(self, kw, entry=None, box="搜索设置项"):
         """系统设置里搜 kw，点结果 entry（默认就是 kw）。"""
@@ -360,7 +448,9 @@ class Phone:
         while time.time() - t0 < 3 and not self.find(box):
             time.sleep(0.15)
         self.tap(box, scrolls=0, wait=0.4)
-        self.d(focused=True).set_text(kw)
+        if not self.type_text(kw):
+            self.say(f"  ✗ 设置搜索框输入「{kw}」失败，跳过")
+            return False
         t0 = time.time()
         while time.time() - t0 < 2.5 and not self.find(entry or kw, exact=True):   # 搜索结果出来就走
             time.sleep(0.15)
@@ -422,9 +512,11 @@ def main():
         g = {"p": p, "__name__": "__recipe__", "ONLY": rest[1:]}
         src = open(rest[0], encoding="utf-8").read()
         build = p.d.shell("getprop ro.build.display.id").output.strip()
+        osv = p.d.shell("getprop ro.mi.os.version.incremental").output.strip()     # 小米：HyperOS 版本号
         m = re.search(r'^BUILD\s*=\s*"([^"]+)"', src, re.M)
-        if m and not build.startswith(m.group(1)):
-            print(f"⚠ 机型脚本是按 {m.group(1)} 录的，这台是 {build}：页面可能对不上，没找到的段会快速跳过")
+        if m and not (build.startswith(m.group(1)) or osv.startswith(m.group(1))):
+            os.environ["AAC_REF"] = "1"
+            print(f"⚠ 机型脚本是按 {m.group(1)} 录的，这台是 {osv or build}：用安全模式跑（只关点名的开关），没找到的段会快速跳过")
         t = time.time()
         exec(src, g)
         print(f"\n机型脚本跑完：关了 {len(p.changed)} 个，{time.time()-t:.0f} 秒")

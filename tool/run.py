@@ -76,6 +76,24 @@ def sh(serial, cmd, check=False):
     return r.stdout.strip()
 
 
+def sh_all(serial, cmd):
+    """stdout + stderr：pm suspend 失败的原因在 stderr 里。"""
+    r = subprocess.run([ADB, "-s", serial, "shell", cmd], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       creationflags=0x08000000 if os.name == "nt" else 0)
+    return (r.stdout + r.stderr).strip()
+
+
+MSA = "com.miui.systemAdSolution"
+
+
+def msa_net(serial, enable):
+    """小米 msa：只挂起拦不住，系统 App 启动时会把它拉起来拉广告（Issue #1）。再禁止它联网。"""
+    sh(serial, f"cmd connectivity set-package-networking-enabled {'true' if enable else 'false'} {MSA}")
+    if not enable:
+        sh(serial, "cmd connectivity set-chain3-enabled true")
+    return sh(serial, f"cmd connectivity get-package-networking-enabled {MSA}")
+
+
 def prop(serial, k):
     return sh(serial, f"getprop {k}")
 
@@ -86,13 +104,41 @@ def info(serial):
         "model": prop(serial, "ro.product.model"),
         "name": prop(serial, "ro.vendor.oplus.market.name") or prop(serial, "ro.product.marketname") or prop(serial, "ro.product.vendor.marketname"),
         "build": prop(serial, "ro.build.display.id"),
+        "os": prop(serial, "ro.mi.os.version.incremental") or prop(serial, "ro.build.version.opporom")
+              or prop(serial, "ro.vivo.os.build.display.id") or prop(serial, "ro.build.version.magic"),
         "android": prop(serial, "ro.build.version.release"),
     }
 
 
-def recipe_for(model):
-    hits = glob.glob(os.path.join(ROOT, "recipes", f"*-{model}", "recipe.py"))
-    return hits[0] if hits else None
+FAMILY = {"oppo": "oppo", "oneplus": "oppo", "realme": "oppo", "honor": "honor",
+          "xiaomi": "xiaomi", "redmi": "xiaomi", "poco": "xiaomi", "vivo": "vivo", "iqoo": "vivo"}
+
+
+def recipe_meta(path):
+    src = open(path, encoding="utf-8").read()
+    m = re.search(r'^BUILD\s*=\s*"([^"]*)"', src, re.M)
+    models = re.search(r'^MODELS\s*=\s*\[([^\]]*)\]', src, re.M)
+    return {"build": m.group(1) if m else "", "steps": re.findall(r'^@step\("([^"]+)"\)', src, re.M),
+            "models": re.findall(r'"([^"]+)"', models.group(1)) if models else []}
+
+
+def recipe_for(model, brand=""):
+    """返回 (路径, 是否参考)。先找本型号（目录名或脚本里的 MODELS）；没有就找同品牌别的机型，作参考。"""
+    allr = sorted(glob.glob(os.path.join(ROOT, "recipes", "*", "recipe.py")))
+    for r in allr:
+        d = os.path.basename(os.path.dirname(r))
+        if d.endswith("-" + model) or model in recipe_meta(r)["models"]:
+            return r, False
+    fam = FAMILY.get((brand or "").lower())
+    for r in allr:
+        if fam and os.path.basename(os.path.dirname(r)).startswith(fam + "-"):
+            return r, True
+    return None, False
+
+
+def build_ok(i, rb):
+    """录制版本 rb 和这台对不对得上：比 ro.build.display.id，小米再比 HyperOS 版本号。"""
+    return (not rb) or i["build"].startswith(rb) or (i.get("os") or "").startswith(rb)
 
 
 def locked(serial):
@@ -169,7 +215,15 @@ DEV_REMINDER = """
 
 
 def py(script, *args):
-    return subprocess.call([sys.executable, os.path.join(TOOL, script), *args])
+    return subprocess.call(script_cmd(script, *args))
+
+
+def script_cmd(script, *args):
+    """启动 tool/ 里的另一个脚本。打包版（客户端）里 sys.executable 是客户端本身，
+    必须带 --cli，否则会再打开一个客户端窗口、引擎没跑起来（Windows 小米 18 Pro Max 反馈）。"""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--cli", script, *args]
+    return [sys.executable, os.path.join(TOOL, script), *args]
 
 
 def main():
@@ -184,22 +238,24 @@ def main():
         for ser, st in rows:
             if st != "device":
                 print(f"{ser}\t{st}\t（unauthorized=手机上点「允许 USB 调试」；offline=重插或重开无线调试）"); continue
-            i = info(ser); r = recipe_for(i["model"])
-            print(f"{ser}\t{i['name'] or i['brand']+' '+i['model']}\t{i['model']}\t{i['build']}\t机型脚本：{os.path.relpath(r, ROOT) if r else '无（只能跑通用部分）'}")
+            i = info(ser); r, ref = recipe_for(i["model"], i["brand"])
+            tag = (os.path.relpath(r, ROOT) + ("（同品牌参考）" if ref else "")) if r else "无（只能跑通用部分）"
+            print(f"{ser}\t{i['name'] or i['brand']+' '+i['model']}\t{i['model']}\t{i['build']}\t机型脚本：{tag}")
         return
     if a[0] != "-s" or len(a) < 3:
         sys.exit("命令格式：run.py -s <序列号> <命令>。先跑 run.py devices 看序列号")
     s, cmd, rest = a[1], a[2], a[3:]
 
     if cmd == "check":
-        i = info(s); r = recipe_for(i["model"])
+        i = info(s); r, ref = recipe_for(i["model"], i["brand"])
         print(f"机型：{i['name'] if i['name'].upper().startswith(i['brand'].upper()) else i['brand']+' '+i['name']}（{i['model']}），系统 {i['build']}，Android {i['android']}")
         print(f"锁屏：{'是（请机主解锁）' if locked(s) else '否'}")
-        if r:
-            src = open(r, encoding="utf-8").read()
-            m = re.search(r'^BUILD\s*=\s*"([^"]*)"', src, re.M)
-            ok = (not m) or i["build"].startswith(m.group(1))
-            print(f"机型脚本：{os.path.relpath(r, ROOT)}；录制版本 {m.group(1) if m else '未标'}，{'版本一致' if ok else '版本不同，部分步骤可能找不到入口'}")
+        if r and ref:
+            print(f"机型脚本：本型号没有；同品牌参考 {os.path.relpath(r, ROOT)}。要用：recipe --ref（安全模式：只关脚本里点名的开关，找不到就跳过）")
+        elif r:
+            rb = recipe_meta(r)["build"]
+            ok = build_ok(i, rb)
+            print(f"机型脚本：{os.path.relpath(r, ROOT)}；录制版本 {rb or '未标'}，{'版本一致' if ok else '版本不同：用安全模式跑，部分步骤可能找不到入口'}")
         else:
             print("机型脚本：没有。可跑：通知渠道 chan-scan/chan-off、广告包挂起；其余照 docs/清单 手动做，或用 tool/explore.py 探路")
         for p in AD_PKGS.get(i["brand"], []):
@@ -221,17 +277,23 @@ def main():
         print(f"快照已存：{d.replace(os.path.expanduser('~'), '~') if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
 
     elif cmd == "recipe":
-        r = recipe_for(info(s)["model"])
-        if not r:
-            sys.exit("这个型号没有机型脚本。见 docs/04-给新机型写脚本.md")
+        i = info(s); r, ref = recipe_for(i["model"], i["brand"])
+        use_ref = "--ref" in rest
+        rest = [x for x in rest if x != "--ref"]
+        if not r or (ref and not use_ref):
+            sys.exit("这个型号没有机型脚本。" + (f"同品牌有参考脚本 {os.path.relpath(r, ROOT)}，加 --ref 试用。" if r else "") +
+                     "写法见 docs/04-给新机型写脚本.md")
         if locked(s):
             sys.exit("手机锁屏了，请机主解锁后再跑")
+        if ref or not build_ok(i, recipe_meta(r)["build"]):
+            os.environ["AAC_REF"] = "1"                 # 安全模式：fast.py 不做整页全关
+            print("⚠ 安全模式：这份机型脚本不是按这台的型号和系统版本录的。只关脚本里点名的开关，找不到入口的步骤跳过。")
         sh(s, "settings put global stay_on_while_plugged_in 7")
         sys.exit(py("fast.py", "-s", s, "run", r, *rest))
 
     elif cmd == "chan-scan":
         d = latest_backup(s)
-        out = subprocess.run([sys.executable, os.path.join(TOOL, "chan_fast.py"), "-s", s, "scan"],
+        out = subprocess.run(script_cmd("chan_fast.py", "-s", s, "scan"),
                              capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         f = os.path.join(d, "channels.tsv")
         open(f, "w", encoding="utf-8").write(
@@ -248,11 +310,22 @@ def main():
         if bad:
             sys.exit(f"这些包挂了会坏功能，不挂：{bad}")
         d = latest_backup(s)
+        fail = 0
         with open(os.path.join(d, "suspended.txt"), "a", encoding="utf-8") as f:
             for p in rest:
-                print(p, sh(s, f"pm suspend --user 0 {p}").splitlines()[-1:] or "")
+                out = sh_all(s, f"pm suspend --user 0 {p}")
                 if suspended(s, p):
                     f.write(p + "\n")
+                    extra = ""
+                    if p == MSA:
+                        sh(s, f"am force-stop {p}")
+                        extra = "，已禁止联网" if "false" in msa_net(s, False).lower() else "，禁止联网没成功"
+                    print(f"  {p}：已挂起{extra}")
+                else:
+                    fail += 1
+                    print(f"  {p}：挂起失败（{(out.splitlines() or ['系统没给原因'])[-1][:160]}）")
+        if fail:
+            sys.exit(1)
 
     elif cmd == "unsuspend":
         pk = rest
@@ -261,6 +334,8 @@ def main():
             pk = sorted(set(open(f, encoding="utf-8").read().split())) if os.path.exists(f) else []
         for p in pk:
             sh(s, f"pm unsuspend --user 0 {p}")
+            if p == MSA:
+                msa_net(s, True)
             print(p, "已挂起" if suspended(s, p) else "已恢复")
 
     elif cmd == "quickapp":
@@ -285,14 +360,26 @@ def main():
                 print("关闭：python3 tool/run.py -s %s quickapp off（要机主同意，可还原）" % s)
         elif sub == "off":
             todo = [q["pkg"] for q in qs if not q["suspended"]]
+            why = {}
             for p in todo:
                 sh(s, f"am force-stop {p}")
-                sh(s, f"pm suspend --user 0 {p}")
+                why[p] = sh_all(s, f"pm suspend --user 0 {p}")
             done = [p for p in todo if suspended(s, p)]
             record(s, done)
+            bad = []
             for q in qs:
-                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if suspended(s, q['pkg']) else '挂起失败'}")
-            print("快应用已关闭。广告里的 hap:// 链接会弹「应用无法使用」，不会跳进快应用。恢复：quickapp on")
+                ok = suspended(s, q["pkg"])
+                reason = "" if ok else "（" + ((why.get(q["pkg"]) or "").splitlines() or ["系统没给原因"])[-1][:160] + "）"
+                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if ok else '挂起失败' + reason}")
+                if not ok:
+                    bad.append(q)
+            if not bad:
+                print("快应用已关闭。广告里的 hap:// 链接会弹「应用无法使用」，不会跳进快应用。恢复：quickapp on")
+            else:
+                # Issue #7：vivo 的快应用挂起被系统拒绝。如实报失败，不说「已关闭」
+                print(f"有 {len(bad)} 个快应用组件挂起失败，这台系统不让挂起它。可以在手机上关掉它的通知："
+                      "设置 → 通知 → 找到「" + "」「".join(q["name"] for q in bad) + "」→ 关掉「允许通知」。")
+                sys.exit(1)
         elif sub == "on":
             for q in qs:
                 sh(s, f"pm unsuspend --user 0 {q['pkg']}")
@@ -315,17 +402,15 @@ def main():
 
     elif cmd == "status-json":
         import json
-        i = info(s); r = recipe_for(i["model"]); steps, rb, ok = [], "", True
+        i = info(s); r, ref = recipe_for(i["model"], i["brand"]); steps, rb, ok = [], "", True
         if r:
-            src = open(r, encoding="utf-8").read()
-            steps = re.findall(r'^@step\("([^"]+)"\)', src, re.M)
-            m = re.search(r'^BUILD\s*=\s*"([^"]*)"', src, re.M)
-            rb = m.group(1) if m else ""
-            ok = i["build"].startswith(rb)
+            meta = recipe_meta(r)
+            steps, rb = meta["steps"], meta["build"]
+            ok = (not ref) and build_ok(i, rb)
         ads = [{"pkg": p, "suspended": suspended(s, p)} for p in AD_PKGS.get(i["brand"], []) if installed(s, p)]
         print(json.dumps({
             "info": i, "locked": locked(s),
-            "recipe": os.path.relpath(r, ROOT) if r else None, "recipe_build": rb, "recipe_ok": ok, "steps": steps,
+            "recipe": os.path.relpath(r, ROOT) if r else None, "recipe_ref": ref, "recipe_build": rb, "recipe_ok": ok, "steps": steps,
             "ads": ads, "quickapps": quickapps(s),
             "stay_on": sh(s, "settings get global stay_on_while_plugged_in"),
             "dev": sh(s, "settings get global development_settings_enabled") == "1",

@@ -215,16 +215,25 @@ async function showDetect(){
   main().innerHTML = `<h1>检测</h1><p class="lead">只读检测完成。</p>${warns.join("")}
     <div class="grid">
       <div class="kv"><small>手机</small><span>${esc(name)}</span></div>
-      <div class="kv"><small>型号 / 系统</small><span>${esc(i.model)}</span> · ${esc(i.build)}</div>
-      <div class="kv"><small>机型脚本</small>${st.recipe ? (st.recipe_ok ? `<span class="tag ok">有，版本一致</span>` : `<span class="tag warn">有，系统版本不同</span>`) : `<span class="tag info">还没有</span>`}</div>
+      <div class="kv"><small>型号 / 系统</small><span>${esc(i.model)}</span> · ${esc(i.os || i.build)}</div>
+      <div class="kv"><small>机型脚本</small>${!st.recipe ? `<span class="tag info">还没有</span>` : st.recipe_ref ? `<span class="tag info">有同品牌参考</span>` : st.recipe_ok ? `<span class="tag ok">有，版本一致</span>` : `<span class="tag warn">有，系统版本不同</span>`}</div>
       <div class="kv"><small>快应用</small>${qa.length ? `<span>${qa.length} 个组件</span> ${qaOff === qa.length ? `<span class="tag ok">已关闭</span>` : `<span class="tag warn">开着</span>`}` : `<span>没有检测到</span>`}</div>
       <div class="kv"><small>广告组件</small>${st.ads.length ? `<span>${st.ads.length} 个</span> ${st.ads.every(a => a.suspended) ? `<span class="tag ok">已挂起</span>` : `<span class="tag warn">在运行</span>`}` : `<span>没有已知的</span>`}</div>
       <div class="kv"><small>开发者模式</small><span>开着</span></div>
     </div>
-    ${st.recipe ? "" : `<div class="note info" style="margin-top:14px">这个机型还没有机型脚本：营销通知、快应用、广告组件可以自动处理；各 App 里的广告开关要照<a href="#" onclick="api.open_url('https://github.com/rddmwmddr/android-ad-cleaner/tree/main/docs/清单');return false">清单</a>手动关。</div>`}
-    ${st.recipe && !st.recipe_ok ? `<div class="note warn" style="margin-top:14px">机型脚本是按 ${esc(st.recipe_build)} 录的，这台是 ${esc(i.build)}。部分步骤可能找不到入口，找不到会跳过，不会乱点。</div>` : ""}
+    ${st.recipe && !st.recipe_ref ? "" : `<div class="note info" style="margin-top:14px">这个型号还没有机型脚本：营销通知、快应用、广告组件可以自动处理；各 App 里的广告开关要照<a href="#" onclick="openChecklist();return false">${esc(checklistName(i.brand))}手动清单</a>关${st.recipe_ref ? `，也可以在下一步试用同品牌别的机型录的参考脚本` : ""}。</div>`}
+    ${st.recipe && !st.recipe_ref && !st.recipe_ok ? `<div class="note warn" style="margin-top:14px">机型脚本是按 ${esc(st.recipe_build)} 录的，这台是 ${esc(i.os || i.build)}。会用安全模式跑：只关脚本里点名的开关，找不到入口的步骤跳过，不会乱点。</div>` : ""}
     <div class="actions"><button class="btn plain" onclick="showConnect()">换一台</button><button class="btn plain" onclick="showDetect()">重新检测</button>
     <button class="btn" ${st.locked || foldBlock ? "disabled" : ""} onclick="showChoose()">下一步</button></div>`;
+}
+
+const CHECKLIST = {OPPO: "OPPO-ColorOS.md", ONEPLUS: "OPPO-ColorOS.md", REALME: "OPPO-ColorOS.md", HONOR: "荣耀-MagicOS.md",
+  XIAOMI: "小米-HyperOS.md", REDMI: "小米-HyperOS.md", POCO: "小米-HyperOS.md", VIVO: "vivo-OriginOS.md", IQOO: "vivo-OriginOS.md"};
+const CHECKLIST_NAME = {"OPPO-ColorOS.md": "OPPO / ColorOS ", "荣耀-MagicOS.md": "荣耀 / MagicOS ", "小米-HyperOS.md": "小米 / HyperOS ", "vivo-OriginOS.md": "vivo / OriginOS "};
+function checklistName(brand){ return CHECKLIST_NAME[CHECKLIST[(brand || "").toUpperCase()]] || ""; }
+function openChecklist(){
+  const f = CHECKLIST[((S.status && S.status.info.brand) || "").toUpperCase()];
+  api.open_url("https://github.com/rddmwmddr/android-ad-cleaner/blob/main/docs/" + encodeURIComponent("清单") + "/" + (f ? encodeURIComponent(f) : "README.md"));
 }
 
 /* ---------- 3 选择 ---------- */
@@ -234,8 +243,10 @@ async function showChoose(){
   const qaOn = st.quickapps.filter(q => !q.suspended), adsOn = st.ads.filter(a => !a.suspended);
   main().innerHTML = `<h1>选择要关的</h1><p class="lead">开始前会存一份改动前的快照，每一项都能在「还原改动」里恢复。</p>
     <div class="card"><h3>各 App 里的广告开关</h3>${st.steps.length ? `
-      <label class="chk"><input type="checkbox" id="c-recipe" checked onchange="document.querySelectorAll('.stp').forEach(x=>x.checked=this.checked)"><span>按机型脚本自动关<small>系统广告、负一屏、搜索、商店、浏览器、主题等 App 里的推荐和广告开关</small></span></label>
-      <div class="chips">${st.steps.map(s => `<label class="chip"><input type="checkbox" class="stp" value="${esc(s)}" checked>${esc(s)}</label>`).join("")}</div>`
+      <label class="chk"><input type="checkbox" id="c-recipe" ${st.recipe_ref ? "" : "checked"} onchange="document.querySelectorAll('.stp').forEach(x=>x.checked=this.checked)"><span>${st.recipe_ref ? `试用同品牌参考脚本（${esc(st.recipe.split("/")[1] || "")} 录制）` : "按机型脚本自动关"}<small>${st.recipe_ref || !st.recipe_ok
+        ? "安全模式：只关脚本里点名的开关，不做整页全关；你的手机页面不一样的话，找不到入口的步骤会跳过。"
+        : "系统广告、负一屏、搜索、商店、浏览器、主题等 App 里的推荐和广告开关。"}「防止 / 限制广告跟踪」这类保护开关会打开。</small></span></label>
+      <div class="chips">${st.steps.map(s => `<label class="chip"><input type="checkbox" class="stp" value="${esc(s)}" ${st.recipe_ref ? "" : "checked"} onchange="if(this.checked)$('#c-recipe').checked=true">${esc(s)}</label>`).join("")}</div>`
       : `<p class="lead" style="margin:0">这个机型还没有机型脚本，这一项要照清单手动做。</p>`}</div>
     <div class="card"><h3>营销通知 <span id="chancount" class="tag info"></span></h3>
       <p class="lead" style="margin:0">按渠道关，同一个 App 的订单、物流、更新、聊天通知保留。服务类渠道（热点共享、红包助手、直播提醒等）默认不勾。</p>
@@ -253,7 +264,7 @@ async function showChoose(){
   renderChans();
 }
 function adName(p){
-  return {"com.opos.ads":"OPPO 广告服务","com.heytap.pictorial":"OPPO 乐划锁屏（锁屏杂志）","com.miui.systemAdSolution":"小米系统广告组件，负责各系统 App 的开屏广告"}[p] || "系统广告组件";
+  return {"com.opos.ads":"OPPO 广告服务","com.heytap.pictorial":"OPPO 乐划锁屏（锁屏杂志）","com.miui.systemAdSolution":"小米系统广告组件，负责天气、日历、商店等系统 App 里的广告。挂起后再禁止它联网，只挂起拦不住"}[p] || "系统广告组件";
 }
 function renderChans(){
   const box = $("#chanbox"); if (!box) return;
@@ -272,6 +283,7 @@ async function go(){
   const plan = {
     backup: true, model: S.status.info.model,
     steps: ($("#c-recipe") && $("#c-recipe").checked) ? steps : [],
+    ref: !!S.status.recipe_ref,
     channels: (S.chans || []).filter(c => c.checked),
     quickapp: !!($("#c-qa") && $("#c-qa").checked),
     ads: [...document.querySelectorAll(".c-ad:checked")].map(x => x.value),
