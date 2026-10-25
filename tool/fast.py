@@ -19,6 +19,7 @@ for _st in (sys.stdout, sys.stderr):
         pass
 import uiautomator2 as u2
 from ui_session import connect
+from troubleshooting import UI_RECOVERY, accessibility_summary
 
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 DISMISS = ("以后再说", "暂不更新", "暂不", "取消", "我知道了", "跳过", "禁止", "不再提示")
@@ -53,14 +54,12 @@ class Phone:
         except u2.exceptions.AccessibilityServiceAlreadyRegisteredError as e:
             raise RuntimeError("UIAUTOMATION_BUSY：手机读屏服务已被占用，本次未点击开关。"
                                "已清理本次失败的启动并重试一次，仍无法连接。"
-                               "请退出旧版客户端、Appium 或其他正在操作同一手机的自动化工具后重试；"
-                               "仍失败请手动重启手机，解锁后只打开一个客户端，再点「检查读屏连接」。"
-                               "无需关闭手机无障碍服务，也无需重装应用或清除数据。\n"
+                               "请退出旧版客户端，只保留一个客户端。\n"
+                               f"{accessibility_summary(serial)}\n{UI_RECOVERY}\n"
                                f"原始异常：{type(e).__name__}: {e}") from e
         except u2.exceptions.UiAutomationError as e:
             raise RuntimeError("手机读屏服务（UiAutomation）启动失败，本次未点击开关。"
-                               "请保持手机解锁，退出正在操作同一手机的其他自动化程序后重试；"
-                               "仍失败时请复制完整诊断，不能仅凭堆栈末尾判断原因。\n"
+                               f"\n{accessibility_summary(serial)}\n{UI_RECOVERY}\n"
                                f"原始异常：{type(e).__name__}: {e}") from e
         try:
             self.d.settings["operation_delay"] = (0, 0)

@@ -118,12 +118,14 @@ class LifecycleTests(unittest.TestCase):
 
     def test_phone_conflict_message_preserves_cause_and_recovery_steps(self):
         with patch.object(fast, "connect", side_effect=session.AccessibilityServiceAlreadyRegisteredError("first cause")), \
+             patch.object(fast, "accessibility_summary", return_value="只读检查：配置了 2 项服务"), \
              contextlib.redirect_stdout(io.StringIO()):
             with self.assertRaises(RuntimeError) as error:
                 fast.Phone("test")
         message = str(error.exception)
-        for phrase in ("UIAUTOMATION_BUSY", "first cause", "手动重启手机", "无需关闭手机无障碍"):
+        for phrase in ("UIAUTOMATION_BUSY", "first cause", "手动重启手机", "GKD", "自动记账", "按需恢复", "2 项服务"):
             self.assertIn(phrase, message)
+        self.assertNotIn("无需关闭手机无障碍", message)
 
     def test_cli_operation_exception_still_closes_phone(self):
         d = Mock(); d.window_size.return_value = (1080, 2400); d.settings = {}
@@ -158,6 +160,9 @@ class TaskTests(unittest.TestCase):
             self.assertEqual(popen.call_count, 2)
             self.assertTrue(api.job["results"][1]["skipped"])
             self.assertEqual(api.job["results"][2]["rc"], 0)
+            self.assertIn("GKD", api.job["recovery"])
+            api.job["total"] = 3
+            self.assertEqual(api.poll()["recovery"], api.job["recovery"])
             self.assertEqual(api.last_error["operation"], "广告开关")
             self.assertIn("first failure", api.last_error["detail"])
 

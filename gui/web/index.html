@@ -251,7 +251,7 @@ async function showChoose(){
       <div class="chips">${st.steps.map(s => `<label class="chip"><input type="checkbox" class="stp" value="${esc(s)}" ${st.recipe_ref ? "" : "checked"} onchange="if(this.checked)$('#c-recipe').checked=true">${esc(s)}</label>`).join("")}</div>`
       : `<p class="lead" style="margin:0">这个机型还没有机型脚本，这一项要照清单手动做。</p>`}</div>
     <div class="card"><h3>营销通知 <span id="chancount" class="tag info"></span></h3>
-      <p class="lead" style="margin:0">按渠道关，同一个 App 的订单、物流、更新、聊天通知保留。服务类渠道（热点共享、红包助手、直播提醒等）默认不勾。</p>
+      <p class="lead" style="margin:0">按渠道关，同一个 App 的订单、物流、更新、聊天通知保留。服务类渠道（热点共享、红包助手、直播提醒等）默认不勾；找机位功能通知受保护，不作为营销关闭。</p>
       <div id="chanbox"><div class="row" style="margin-top:10px"><span class="spin"></span>正在扫描通知渠道……</div></div></div>
     <div class="card"><h3>快应用</h3>${qaOn.length ? `
       <label class="chk"><input type="checkbox" id="c-qa"><span>关闭快应用（${qaOn.map(q => esc(q.name)).join("、")}）
@@ -359,6 +359,7 @@ function showDone(r){
   if (!r.results.length){ r.results = []; }
   main().innerHTML = `<h1>${ok ? "完成" : "已结束（有步骤没成功）"}</h1><p class="lead">用时 ${r.sec} 秒。去下拉搜索、负一屏、应用商店、浏览器看一眼，确认功能正常。</p>
     <div class="card ${r.results.length ? "" : "hide"}">${r.results.map(x => `<div class="res"><span class="tag ${x.rc === 0 ? "ok" : "bad"}">${x.skipped ? "跳过" : x.rc === 0 ? "成功" : "失败"}</span><span class="t">${esc(x.title)}</span><span class="d">${esc(summarize(x))} · ${x.sec} 秒</span></div>`).join("")}</div>
+    ${r.recovery ? `<div class="card" id="ui-recovery"><h3>排查读屏连接</h3><p class="lead">${esc(r.recovery)}</p><div class="actions"><button class="btn plain" onclick="checkUi()">检查读屏连接</button><button class="btn plain" onclick="copyDiagnostics()">复制完整诊断</button></div></div>` : ""}
     <div class="card"><h3>最后一步：关闭开发者模式</h3>
       <p class="lead" style="margin:0 0 12px">${ok ? "核对结果后，若不再使用电脑调试，建议关闭开发者模式和 USB 调试。" : "有步骤未成功；若还要排查或重试，请先保留 USB 调试。结束排查后再关闭。"}部分银行、支付、游戏 App 检测到它开着会提醒或拒绝运行。<br>关掉<b>不会撤销</b>已经成功的改动。</p>
       <div class="row"><button class="btn" onclick="askDevOff()">帮我关闭</button><button class="btn plain" onclick="selfOff()">我在手机上自己关</button></div></div>

@@ -15,6 +15,7 @@ for _st in (sys.stdout, sys.stderr):
         pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fast import Phone, bounds
+from channel_policy import protected_channel
 
 
 class ShellPhone:
@@ -158,6 +159,9 @@ def toggle(p, pk, cid, want_on, name=""):
         if p.locked():
             return "手机锁屏了，请机主解锁后再跑"
         before, apps_before = parse(p)
+        actual_name = before.get((pk, cid), ("", 0, False))[0]
+        if not want_on and protected_channel(actual_name, cid, name):
+            return "受保护的找机位功能通知，未关闭"
         if state(before, apps_before, pk, cid) in ("--", "del", "app"):
             return "渠道不存在、已删除或应用通知已关闭，未操作"
         # NEW_TASK|CLEAR_TASK 避免复用旧渠道；仍需核对真实页面。
@@ -211,7 +215,8 @@ def main():
     if cmd == "scan":
         d, app_off = parse(reader)
         for (pk, cid), (name, imp, deleted) in sorted(d.items()):
-            if imp != 0 and not deleted and not app_off.get(pk) and KW.search(name + " " + cid) and not SKIP.search(name):
+            if (imp != 0 and not deleted and not app_off.get(pk) and KW.search(name + " " + cid)
+                    and not SKIP.search(name) and not protected_channel(name, cid)):
                 print(f"{pk}\t{cid}\t{name}")
         return
     if cmd in ("off", "on"):
@@ -222,6 +227,9 @@ def main():
         try:
             for pk, cid, label in items:
                 st = state(d, app_off, pk, cid)
+                if not want and protected_channel(d.get((pk, cid), ("", 0, False))[0], cid, label):
+                    print(f"  · 受保护，未改动 {label}（找机位功能通知，当前状态 {st}）")
+                    continue
                 if st in ("--", "del", "app"):
                     print(f"  · 未操作 {label}（渠道不存在、已删除或应用通知已关闭）")
                     if want or st == "--":
@@ -246,9 +254,10 @@ def main():
     bad = 0
     for pk, cid, label in items:
         st = state(d, app_off, pk, cid)
-        if st == "ON": bad += 1
+        protected = protected_channel(d.get((pk, cid), ("", 0, False))[0], cid, label)
+        if st == "ON" and not protected: bad += 1
         if cmd == "verify":
-            print(f"{st:4} {label}")
+            print(f"{st:4} {label}" + ("（受保护，不参与营销关闭）" if protected else ""))
     print(f"营销渠道仍开着: {bad} 个")
     if cmd == "on":
         pending = sum(state(d, app_off, pk, cid) != "ON" for pk, cid, _ in items)

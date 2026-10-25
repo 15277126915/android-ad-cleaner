@@ -14,6 +14,9 @@ FROZEN = getattr(sys, "frozen", False)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOOL = os.path.join(BASE, "tool")
 IS_WIN = platform.system() == "Windows"
+sys.path.insert(0, TOOL)
+from channel_policy import protected_channel
+from troubleshooting import UI_RECOVERY, is_ui_connection_error
 
 
 def data_dir():
@@ -222,6 +225,8 @@ class Api:
         for line in out.splitlines():
             parts = line.split("\t")
             if len(parts) >= 3:
+                if protected_channel(parts[2], parts[1]):
+                    continue  # 旧扫描结果也不能经「全选」把功能通知勾回去
                 rows.append({"pkg": parts[0], "id": parts[1], "name": parts[2],
                              "checked": not SERVICE.search(line)})
         return rows
@@ -242,9 +247,15 @@ class Api:
         causes = [line.strip() for line in lines if re.search(r"(?:Exception|Error|Caused by:|原始异常：|启动失败)", line)
                   and not line.lstrip().startswith("at ")]
         summary = "\n".join(causes[:4]) or (detail if len(detail) <= 600 else detail[:600] + "…")
+        recovery = UI_RECOVERY if is_ui_connection_error(detail) else ""
+        if recovery:
+            summary = recovery + "\n\n" + summary
         if len(summary) > 1000:
             summary = summary[:1000] + "…（完整原因见诊断）"
-        return {"error": summary, "detail": detail}
+        result = {"error": summary, "detail": detail}
+        if recovery:
+            result["recovery"] = recovery
+        return result
 
     def ui_check(self, serial):
         with self.lock:
@@ -335,7 +346,9 @@ class Api:
             if rc:
                 detail = "\n".join(j["lines"][line_start:])
                 ui_busy = ui_busy or "UIAUTOMATION_BUSY" in detail or "DeviceBusyError" in detail
-                self._remember_error(title, j["serial"], detail)
+                error = self._remember_error(title, j["serial"], detail)
+                if error.get("recovery"):
+                    j["recovery"] = error["recovery"]
         j["running"] = False
         j["proc"] = None
         self._log(f"\n执行结束，用时 {round(time.time() - j['t0'])} 秒" if not j["cancel"] else "\n已停止")
@@ -347,7 +360,7 @@ class Api:
         lines = j["lines"][since:]
         return {"running": j["running"], "lines": lines, "next": since + len(lines), "idx": j["idx"],
                 "total": j["total"], "title": j["title"], "results": j["results"] if not j["running"] else [],
-                "sec": round(time.time() - j["t0"]), "cancel": j["cancel"]}
+                "sec": round(time.time() - j["t0"]), "cancel": j["cancel"], "recovery": j.get("recovery", "")}
 
     def stop(self):
         if self.job and self.job["running"]:
@@ -445,7 +458,7 @@ class Api:
 
 
 def smoke_gui(window, result):
-    """只验证本地页面、图片和 JS→Python 桥；不连接或修改手机。"""
+    """验证本地页面、图片、JS→Python 桥和模拟失败提示；不连接或修改手机。"""
     try:
         if not window.events.loaded.wait(30):
             raise RuntimeError("页面加载超时")
@@ -464,8 +477,20 @@ def smoke_gui(window, result):
                 from webview import http
                 if http.global_server is not None:
                     raise RuntimeError("不应启动本地 HTTP 服务")
+                simulated = {"sec": 0, "cancel": False, "recovery": UI_RECOVERY,
+                             "results": [{"rc": 1, "title": "读屏检查（模拟）", "sec": 0,
+                                          "tail": ["UIAUTOMATION_BUSY: simulated"]}]}
+                window.evaluate_js("showDone(" + json.dumps(simulated, ensure_ascii=False) + ")")
+                hint_ok = window.evaluate_js("""(() => {
+                    const box = document.querySelector('#ui-recovery');
+                    return !!box && box.offsetHeight > 0 && box.textContent.includes('GKD') &&
+                        box.textContent.includes('自动记账') && box.textContent.includes('检查读屏连接') &&
+                        box.textContent.includes('复制完整诊断');
+                })()""")
+                if not hint_ok:
+                    raise RuntimeError("读屏冲突排查提示未显示")
                 result["ok"] = True
-                print("GUI smoke: file 页面、教程图片、JS API 桥通过；未启动 HTTP 服务", flush=True)
+                print("GUI smoke: file 页面、教程图片、JS API 桥、读屏失败排查提示通过；未启动 HTTP 服务", flush=True)
                 return
             time.sleep(0.1)
         raise RuntimeError("教程图片或 JS API 调用未通过")
