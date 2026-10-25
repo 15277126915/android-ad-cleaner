@@ -206,6 +206,117 @@ class LaunchTests(unittest.TestCase):
             p.start("com.example.no_launcher")
         p.texts.assert_not_called()
 
+    def test_runtime_permission_only_clicks_explicit_deny_button(self):
+        p = phone(); p.focus = Mock(return_value="com.android.permissioncontroller/.permission.ui.GrantPermissionsActivity")
+        p.tree = Mock(return_value=ET.fromstring('''<hierarchy>
+          <node package="com.android.permissioncontroller" class="android.widget.Button" text="允许" bounds="[10,100][200,200]"/>
+          <node package="com.android.permissioncontroller" class="android.widget.Button" text="拒绝" bounds="[10,300][200,400]"/>
+        </hierarchy>'''))
+        p.click = Mock()
+        with patch.object(fast.time, "sleep"):
+            self.assertEqual(p.dismiss(), "拒绝权限")
+        p.click.assert_called_once_with(105, 350)
+
+    def test_permission_page_without_deny_does_not_grant_permission(self):
+        p = phone(); p.focus = Mock(return_value="com.android.permissioncontroller/.permission.ui.GrantPermissionsActivity")
+        p.tree = Mock(return_value=ET.fromstring('''<hierarchy><node package="com.android.permissioncontroller"
+          class="android.widget.Button" text="允许" bounds="[10,100][200,200]"/></hierarchy>'''))
+        p.click = Mock()
+        self.assertIsNone(p.dismiss())
+        p.click.assert_not_called()
+
+    def test_launch_handles_permission_gate_before_checking_target_foreground(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Starting")
+        p.focus = Mock(side_effect=["com.android.permissioncontroller/.GrantPermissionsActivity"] * 2 + ["com.example/.Main"] * 3)
+        p.texts = Mock(return_value=[("首页", (), None)]); p.dismiss = Mock(return_value="拒绝权限")
+        with patch.object(fast.time, "sleep"):
+            p.start("com.example", settle=0)
+        p.dismiss.assert_called_once()
+
+    def test_sparse_homepage_is_not_dismissed_as_an_ad(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Events injected: 1")
+        p.focus = Mock(return_value="com.example/.Main")
+        p.texts = Mock(return_value=[("首页", (), None), ("我的", (), None)])
+        with patch.object(fast.time, "sleep"):
+            p.start("com.example", settle=0)
+        self.assertNotIn("input keyevent BACK", [c.args[0] for c in p.d.shell.call_args_list])
+
+    def test_late_permission_gate_is_denied_before_accepting_launch(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Starting")
+        p.focus = Mock(side_effect=["com.example/.Main", "com.android.permissioncontroller/.GrantPermissionsActivity"] + ["com.example/.Main"] * 2)
+        p.texts = Mock(return_value=[("首页", (), None)])
+        p.dismiss = Mock(return_value="拒绝权限")
+        with patch.object(fast.time, "sleep"):
+            p.start("com.example", settle=0)
+        p.dismiss.assert_called_once()
+
+    def test_late_permission_without_deny_button_stops(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Starting")
+        p.focus = Mock(side_effect=["com.example/.Main", "com.android.permissioncontroller/.GrantPermissionsActivity"])
+        p.texts = Mock(return_value=[("首页", (), None)])
+        p.dismiss = Mock(return_value=None)
+        with self.assertRaisesRegex(RuntimeError, "离开前台"):
+            p.start("com.example", settle=0)
+        p.dismiss.assert_called_once()
+
+    def test_start_leaving_target_app_stops_before_dismiss_or_click(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Events injected: 1")
+        p.focus = Mock(side_effect=["com.example/.Main", "com.other/.Account"])
+        p.texts = Mock(return_value=[])
+        p.dismiss = Mock()
+        with patch.object(fast.time, "time", side_effect=itertools.count()), patch.object(fast.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "离开前台"):
+                p.start("com.example")
+        p.dismiss.assert_not_called()
+
+    def test_dismiss_leaving_target_app_is_not_accepted_as_success(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Events injected: 1")
+        p.focus = Mock(side_effect=["com.example/.Main"] * 3 + ["com.other/.Main"])
+        p.texts = Mock(return_value=[("首页", (), None)])
+        p.dismiss = Mock()
+        with patch.object(fast.time, "time", side_effect=itertools.count(0, .1)), patch.object(fast.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "离开前台"):
+                p.start("com.example", settle=.2)
+
+    def test_slow_blank_start_waits_for_page_without_pressing_back(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Starting")
+        p.focus = Mock(return_value="com.example/.Main")
+        p.texts = Mock(side_effect=[[], [], [("首页", (), None)]])
+        p.dismiss = Mock(return_value=None)
+        with patch.object(fast.time, "time", side_effect=itertools.count(0, .5)), patch.object(fast.time, "sleep"):
+            p.start("com.example", settle=0)
+        self.assertNotIn("input keyevent BACK", [c.args[0] for c in p.d.shell.call_args_list])
+
+    def test_unreadable_start_is_bounded_and_does_not_press_back(self):
+        p = phone()
+        p.d.shell.return_value = types.SimpleNamespace(exit_code=0, output="Starting")
+        p.focus = Mock(return_value="com.example/.Main")
+        p.texts = Mock(return_value=[]); p.dismiss = Mock(return_value=None)
+        with patch.object(fast.time, "time", side_effect=itertools.count()), patch.object(fast.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "仍读不到页面"):
+                p.start("com.example")
+        self.assertNotIn("input keyevent BACK", [c.args[0] for c in p.d.shell.call_args_list])
+
+    def test_recipe_declared_failures_return_failure_after_preserving_change_log(self):
+        p = phone(); p.locked = Mock(return_value=False)
+        p.d.shell.return_value = types.SimpleNamespace(output="test-build")
+        p.changed = [("已成功的页面", "个性化推荐")]
+        with tempfile.TemporaryDirectory() as directory:
+            recipe = Path(directory) / "recipe.py"
+            recipe.write_text('FAILED_STEPS = ["服务管理"]\n', encoding="utf-8")
+            with patch.dict(os.environ, {"AAC_BACKUPS": directory}), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(SystemExit) as result:
+                    fast.execute(p, "run", [str(recipe)])
+            self.assertEqual(result.exception.code, 1)
+            self.assertIn("已成功的页面", Path(directory, "run-log.txt").read_text(encoding="utf-8"))
+
     def test_version_mismatch_reaches_safe_mode(self):
         p = phone()
         p.locked = Mock(return_value=False)

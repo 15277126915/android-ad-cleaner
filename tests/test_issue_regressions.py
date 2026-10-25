@@ -84,6 +84,26 @@ class ChannelTests(unittest.TestCase):
         p.focus.return_value = "com.android.settings/.Settings$AppNotificationSettingsActivity"
         self.assertIsNone(chan.channel_switch(p, "营销"))
 
+    def test_coloros14_separate_channel_page_is_supported(self, _sleep):
+        p = channel_phone()
+        p.focus.return_value = "com.oplus.notificationmanager/com.oplus.notificationmanager.ChannelNotificationSettingsActivity"
+        self.assertEqual(chan.channel_switch(p, "营销")[0], "允许通知")
+        self.assertIsNone(chan.channel_switch(p, "其他渠道"))
+
+    def test_coloros14_app_master_page_remains_forbidden(self, _sleep):
+        p = channel_phone()
+        p.focus.return_value = "com.oplus.notificationmanager/com.oplus.notificationmanager.AppNotificationSettingsActivity"
+        self.assertIsNone(chan.channel_switch(p, "营销"))
+
+    def test_coloros14_unknown_page_or_lookalike_package_is_not_trusted(self, _sleep):
+        p = channel_phone()
+        for focus in (
+            "com.oplus.notificationmanager/com.oplus.notificationmanager.OtherActivity",
+            "com.example.notificationmanager/com.oplus.notificationmanager.ChannelNotificationSettingsActivity",
+        ):
+            p.focus.return_value = focus
+            self.assertIsNone(chan.channel_switch(p, "营销"))
+
     def test_same_text_in_unrelated_page_cannot_authorize_click(self, _sleep):
         p = channel_phone()
         p.focus.return_value = "com.example/.MarketingSettings"

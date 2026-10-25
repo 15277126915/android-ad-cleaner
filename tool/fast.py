@@ -23,6 +23,7 @@ from ui_session import connect
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 DISMISS = ("以后再说", "暂不更新", "暂不", "取消", "我知道了", "跳过", "禁止", "不再提示")
 CONFIRM = ("确定", "关闭", "仍要关闭", "确认关闭", "确认", "继续关闭", "关闭推荐", "仍然关闭")
+PERMISSION_CONTROLLERS = {"com.android.permissioncontroller", "com.google.android.permissioncontroller"}
 
 
 def bounds(n):
@@ -296,6 +297,17 @@ class Phone:
         """挡路的更新/推荐/权限弹窗：点拒绝类按钮（不替用户同意任何东西）。
         纯图片的广告弹窗没有文字，只有一个 ✕ 图标：找 desc/id 里带 close 的可点元素。"""
         root = self.tree()
+        # Android 运行时权限页只点明确的拒绝按钮，不替用户授予权限或修改“不再询问”。
+        if (any(n.get("package") in PERMISSION_CONTROLLERS for n in root.iter("node"))
+                and self.focus().split("/", 1)[0] in PERMISSION_CONTROLLERS):
+            for n in root.iter("node"):
+                if (n.get("package") in PERMISSION_CONTROLLERS and "Button" in n.get("class", "")
+                        and n.get("text") in ("拒绝", "不允许", "Deny", "Don't allow") and self.on_screen(n)):
+                    l, t, r, b = bounds(n)
+                    self.click((l+r)//2, (t+b)//2); time.sleep(.4)
+                    self.say("  · 已拒绝运行时权限申请，未授予权限")
+                    return "拒绝权限"
+            return None
         for n in root.iter("node"):
             if n.get("clickable") != "true" or n.get("package") == "com.android.systemui":
                 continue
@@ -612,18 +624,43 @@ class Phone:
         deadline = time.monotonic() + 5
         expected = foreground or pkg
         while self.focus().split("/", 1)[0] != expected:
+            if self.focus().split("/", 1)[0] in PERMISSION_CONTROLLERS:
+                self.dismiss()
             if time.monotonic() >= deadline:
                 raise RuntimeError(f"{pkg} 没有进入前台，跳过本段")
             time.sleep(0.2)
+        def check_foreground():
+            current = self.focus().split("/", 1)[0]
+            # 权限申请可能在首页已出现后才弹出，也只能拒绝；不在其他 App 上找关闭按钮。
+            if current in PERMISSION_CONTROLLERS:
+                until = time.monotonic() + 3
+                while current in PERMISSION_CONTROLLERS or not current:
+                    if time.monotonic() >= until:
+                        break
+                    if current and not self.dismiss():
+                        break
+                    time.sleep(.2)
+                    current = self.focus().split("/", 1)[0]
+            if current != expected:
+                raise RuntimeError(f"{pkg} 启动后离开前台，停止本段以免操作其他 App")
+
+        # 旧版商店冷启动可能暂时没有可读文字；空白不等于广告，不能盲按返回退出 App。
         t = time.time()
-        while time.time() - t < 3 and len(self.texts()) < 3:   # 等首屏画出来
-            time.sleep(0.15)
-        if len(self.texts()) < 3:          # 还是空白：多半是读不到的全屏广告弹窗，按一次返回关掉
-            self.d.shell("input keyevent BACK"); time.sleep(0.8)
-            self.say("  · 首屏读不到（广告弹窗？），按了一次返回")
+        while time.time() - t < 8:
+            check_foreground()
+            if self.texts():               # 一两个标签也可能是正常首页
+                break
+            self.dismiss()                # 仅尝试可识别的关闭 / 拒绝按钮
+            time.sleep(.2)
+        else:
+            raise RuntimeError(f"{pkg} 启动后 8 秒仍读不到页面，停止本段；请确认首页已加载后重试")
+
+        t = time.time()                    # 首屏加载较慢时，也要给引导/更新弹窗留下处理时间
         while time.time() - t < settle:
+            check_foreground()
             self.dismiss()
             time.sleep(0.4)
+        check_foreground()
 
 
 def main():
@@ -693,6 +730,9 @@ def execute(p, cmd, rest):
                     f.write(f"{pg}\t{tt}\n")
         except OSError:
             pass
+        if g.get("FAILED_STEPS"):
+            print("未完成步骤：" + "、".join(g["FAILED_STEPS"]), flush=True)
+            sys.exit(1)
     else:
         print(__doc__)
 

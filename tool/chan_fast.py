@@ -32,7 +32,7 @@ class ShellPhone:
         return SimpleNamespace(output=result.stdout)
 
 KW = re.compile(r"营销|活动|推荐|推广|热点|热门|资讯|新闻|福利|优惠|特惠|精选|精彩|运营|促销|红包|直播|种草|内容|头条|猜你|好物|权益|会员|签到|广告|recommend|promo|market|deal|news|topstory|upsell|offer", re.I)
-SKIP = re.compile(r"下载|更新|安装|上传|订单|物流|快递|交易|支付|账号|安全|验证|通话|来电|消息|聊天|私信|评论|互动|提醒|闹钟|日程|天气预警|系统|前台|后台|服务运行|播放|媒体"
+SKIP = re.compile(r"下载|更新|安装|上传|订单|物流|快递|交易|支付|付款|\bpayments?\b|账号|安全|验证|通话|来电|消息|聊天|私信|评论|互动|提醒|闹钟|日程|天气预警|系统|前台|后台|服务运行|播放|媒体"
                   r"|热点和网络共享|智能热点|红包助手|盗窃|驾驶状态|权限建议|运营商|警告|告警|实时活动|赛事|护眼", re.I)
 
 
@@ -83,6 +83,12 @@ def notification_focus(p):
     if "com.vivo.systemuiplugin" in focus:
         raise RuntimeError("此 vivo 通知页的开关会影响整个 App，已跳过以保留订单、聊天等通知")
     package, _, activity = focus.partition("/")
+    # ColorOS 14 / 一加 Ace 2 Pro：系统通知页由独立包承载。只接受实测的两个设置 Activity。
+    if package == "com.oplus.notificationmanager" and activity in {
+        "com.oplus.notificationmanager.ChannelNotificationSettingsActivity",
+        "com.oplus.notificationmanager.AppNotificationSettingsActivity",
+    }:
+        return focus
     return focus if "settings" in package.lower() and ("notification" in activity.lower() or "SubSettings" in activity) else ""
 
 

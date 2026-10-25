@@ -40,6 +40,12 @@ class ReadOnlyTests(unittest.TestCase):
     def test_scan_survives_unavailable_automation(self):
         self.assertEqual(self.invoke(["scan"], dump()), "com.example\tpromo\t活动优惠\n")
 
+    def test_mixed_payment_and_deals_channel_is_not_marketing_candidate(self):
+        # 一加 Ace 2 Pro 实机 Google Play 渠道同时承载付款和推荐，不能因推荐字样关闭。
+        for name in ("付款事宜、特惠信息和推荐内容", "Payments, deals and recommendations"):
+            with self.subTest(name=name):
+                self.assertEqual(self.invoke(["scan"], dump().replace("活动优惠", name)), "")
+
     def test_verify_and_noop_close_never_initialize_or_navigate(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory, "channels.tsv")
