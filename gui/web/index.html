@@ -261,12 +261,12 @@ async function showChoose(){
       <label class="chk"><input type="checkbox" class="c-ad" value="${esc(a.pkg)}"><span>挂起 <code>${esc(a.pkg)}</code><small>${adName(a.pkg)}。挂起只是暂停运行，可还原，不影响系统更新。</small></span></label>`).join("")
       : `<p class="lead" style="margin:0">${st.ads.length ? "已经挂起。" : "没有已知的广告组件。"}</p>`}</div>
     <div class="note info">执行期间请保持手机亮屏、解锁、插着线，不要碰手机。</div>
-    <div class="actions"><button class="btn plain" onclick="showDetect()">上一步</button><button class="btn" onclick="go()">开始执行</button></div>`;
+    <div class="actions"><button class="btn plain" onclick="showDetect()">上一步</button><button class="btn plain" id="ui-check" onclick="checkUi()">检查读屏连接</button><button class="btn" onclick="go()">开始执行</button></div>`;
   if (!S.chans){
-    S.chanError = "";
+    S.chanError = ""; S.chanDetail = "";
     try {
       const result = await api.chan_scan(S.serial);
-      if (result.error){ S.chanError = result.error; S.chans = []; }
+      if (result.error){ S.chanError = result.error; S.chanDetail = result.detail || result.error; S.chans = []; }
       else S.chans = result;
     } catch(e){ S.chanError = String(e); S.chans = []; }
   }
@@ -277,7 +277,7 @@ function adName(p){
 }
 function renderChans(){
   const box = $("#chanbox"); if (!box) return;
-  if (S.chanError){ box.innerHTML = `<div class="note bad">通知扫描未完成：${esc(S.chanError)}</div><button class="btn plain" onclick="S.chans=null;showChoose()">重新扫描</button>`; $("#chancount").textContent = ""; return; }
+  if (S.chanError){ box.innerHTML = `<div class="note bad">通知扫描未完成：${esc(S.chanError)}</div>${errorDetails(S.chanDetail || S.chanError)}<div class="actions"><button class="btn plain" onclick="S.chans=null;showChoose()">重新扫描</button><button class="btn plain" onclick="copyDiagnostics()">复制完整诊断</button></div>`; $("#chancount").textContent = ""; return; }
   if (!S.chans.length){ box.innerHTML = `<p class="lead" style="margin:10px 0 0">未发现已创建且开启的营销候选渠道。新设备或刚重置的设备上，App 可能尚未创建渠道，正常使用后可再次扫描。</p>`; $("#chancount").textContent = ""; return; }
   box.innerHTML = `<div class="row" style="margin-top:10px"><button class="btn plain" onclick="chAll(true)">全选</button><button class="btn plain" onclick="chAll(false)">全不选</button></div>
     <div class="chan"><table>${S.chans.map((c, k) => `<tr><td style="width:28px"><input type="checkbox" class="ch" data-k="${k}" ${c.checked ? "checked" : ""} onchange="S.chans[${k}].checked=this.checked;chCount()"></td><td>${esc(c.name)}</td><td class="pkg">${esc(c.pkg)}</td></tr>`).join("")}</table></div>`;
@@ -285,6 +285,22 @@ function renderChans(){
 }
 function chAll(v){ S.chans.forEach(c => c.checked = v); renderChans(); }
 function chCount(){ $("#chancount").textContent = `已选 ${S.chans.filter(c => c.checked).length} / ${S.chans.length}`; }
+function errorDetails(detail){
+  return `<details><summary>查看完整诊断</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;font-size:12px">${esc(detail)}</pre></details>`;
+}
+async function copyDiagnostics(){
+  const ok = await api.copy_text(await api.diagnostics());
+  modal(`<h3>${ok ? "完整诊断已复制" : "复制失败"}</h3><p class="lead">${ok ? "可以粘贴给维护者。序列号和错误中的用户目录已替换；发送前请检查内容。" : "请点左下角「反馈问题」，展开诊断信息后手动复制。"}</p><div class="actions"><button class="btn" onclick="closeModal()">好</button></div>`);
+}
+async function checkUi(){
+  const button = $("#ui-check");
+  button.disabled = true; button.textContent = "正在检查……";
+  try {
+    const result = await api.ui_check(S.serial);
+    modal(`<h3>${result.error ? "读屏连接未就绪" : "读屏连接正常"}</h3><p class="lead">${esc(result.error || result.message)}</p>${result.detail ? errorDetails(result.detail) : ""}<div class="actions"><button class="btn plain" onclick="closeModal()">关闭</button>${result.error ? '<button class="btn" onclick="copyDiagnostics()">复制完整诊断</button>' : ""}</div>`, true);
+  } catch(e){ modal(`<h3>检查未完成</h3><p>${esc(e)}</p><button class="btn" onclick="closeModal()">关闭</button>`); }
+  finally { button.disabled = false; button.textContent = "检查读屏连接"; }
+}
 
 /* ---------- 4 执行 ---------- */
 let pollJob = null;

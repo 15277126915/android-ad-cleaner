@@ -3,6 +3,7 @@
 
 命令行：
   fast.py -s SERIAL ls                 列当前屏：文字 + 开关状态
+  fast.py -s SERIAL check              检查读屏服务，不点击、不输出页面内容
   fast.py -s SERIAL tap 文字 [文字…]    依次点（找不到会往下翻着找）
   fast.py -s SERIAL off [保留词,…]      当前列表里开着的开关全关（保留词命中的不动），一路翻到底
   fast.py -s SERIAL scan                 只读：翻到底列出所有开关
@@ -43,7 +44,15 @@ def want_state(title):
 
 class Phone:
     def __init__(self, serial, log=True):
-        self.d = u2.connect(serial)
+        if log:
+            print("正在连接手机读屏服务……", flush=True)
+        try:
+            self.d = u2.connect(serial)
+        except u2.exceptions.UiAutomationError as e:
+            raise RuntimeError("手机读屏服务（UiAutomation）启动失败，本次未点击开关。"
+                               "请保持手机解锁，退出正在操作同一手机的其他自动化程序后重试；"
+                               "仍失败时请复制完整诊断，不能仅凭堆栈末尾判断原因。\n"
+                               f"原始异常：{type(e).__name__}: {e}") from e
         self.d.settings["operation_delay"] = (0, 0)
         self.W, self.H = self.d.window_size()
         self.log = log
@@ -598,10 +607,18 @@ class Phone:
 
 def main():
     a = sys.argv[1:]
+    if a in ([], ["--help"], ["-h"]):
+        print(__doc__); return
     if len(a) < 3 or a[0] != "-s":
         print(__doc__); sys.exit(1)
     p = Phone(a[1]); cmd, rest = a[2], a[3:]
-    if cmd == "ls":
+    if cmd == "check":
+        if p.locked():
+            sys.exit("手机锁屏了，请机主解锁后重试")
+        if not list(p.tree().iter("node")):
+            sys.exit("读屏服务已连接，但没有读到页面节点，请解锁并停在设置首页后重试")
+        print(f"读屏检查通过：{p.W} × {p.H}；未点击或修改任何开关")
+    elif cmd == "ls":
         p.ls()
     elif cmd == "tap":
         for t in rest:

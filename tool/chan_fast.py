@@ -6,7 +6,8 @@
   chan_fast.py -s SERIAL on  清单.tsv      还原
 清单.tsv：包名<TAB>渠道id<TAB>说明，一行一个；# 开头是注释。
 """
-import re, shlex, sys, time, os
+import re, shlex, sys, time, os, subprocess
+from types import SimpleNamespace
 for _st in (sys.stdout, sys.stderr):
     try:
         _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
@@ -14,6 +15,21 @@ for _st in (sys.stdout, sys.stderr):
         pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fast import Phone, bounds
+
+
+class ShellPhone:
+    """扫描和复查只读 adb，不启动手机端 UiAutomation。"""
+    def __init__(self, serial):
+        self.serial, self.d = serial, self
+
+    def shell(self, command, timeout=60):
+        from run import ADB
+        result = subprocess.run([ADB, "-s", self.serial, "shell", command], capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                                creationflags=0x08000000 if os.name == "nt" else 0)
+        if result.returncode:
+            raise RuntimeError("adb 读取失败：" + (result.stderr or result.stdout).strip())
+        return SimpleNamespace(output=result.stdout)
 
 KW = re.compile(r"营销|活动|推荐|推广|热点|热门|资讯|新闻|福利|优惠|特惠|精选|精彩|运营|促销|红包|直播|种草|内容|头条|猜你|好物|权益|会员|签到|广告|recommend|promo|market|deal|news|topstory|upsell|offer", re.I)
 SKIP = re.compile(r"下载|更新|安装|上传|订单|物流|快递|交易|支付|账号|安全|验证|通话|来电|消息|聊天|私信|评论|互动|提醒|闹钟|日程|天气预警|系统|前台|后台|服务运行|播放|媒体"
@@ -176,17 +192,26 @@ def toggle(p, pk, cid, want_on, name=""):
 
 def main():
     a = sys.argv[1:]
-    p = Phone(a[1], log=False); cmd = a[2]
+    if a in ([], ["--help"], ["-h"]):
+        print(__doc__); return
+    if len(a) < 3 or a[0] != "-s" or a[2] not in {"scan", "verify", "off", "on"}:
+        sys.exit("用法：chan_fast.py -s <序列号> scan|verify|off|on [清单.tsv]")
+    serial, cmd = a[1], a[2]
+    if cmd != "scan" and len(a) < 4:
+        sys.exit("请提供通知清单路径")
+    # 先校验文件；错误清单不应启动手机读屏服务。
+    items = load(a[3]) if cmd != "scan" else []
+    reader = ShellPhone(serial)
     if cmd == "scan":
-        d, app_off = parse(p)
+        d, app_off = parse(reader)
         for (pk, cid), (name, imp, deleted) in sorted(d.items()):
             if imp != 0 and not deleted and not app_off.get(pk) and KW.search(name + " " + cid) and not SKIP.search(name):
                 print(f"{pk}\t{cid}\t{name}")
         return
-    items = load(a[3])
     if cmd in ("off", "on"):
         want = cmd == "on"
-        d, app_off = parse(p)
+        d, app_off = parse(reader)
+        p = None
         t0 = time.time(); n = 0; failures = 0
         for pk, cid, label in items:
             st = state(d, app_off, pk, cid)
@@ -197,13 +222,17 @@ def main():
                 continue
             if (st == "off") == (not want):
                 continue
+            if p is None:
+                print("正在连接手机读屏服务……", flush=True)
+                p = Phone(serial, log=False)
             err = toggle(p, pk, cid, want, d[(pk, cid)][0])
             n += 1
             failures += bool(err)
             print(f"  {'✗ '+err if err else ('开' if want else '关')}  {label}")
-        p.d.shell("input keyevent HOME")   # 别走 u2 的 press：连接断过一次
+        if p is not None:
+            p.d.shell("input keyevent HOME")   # 只读 / 无需改动时不操作手机页面
         print(f"拨了 {n} 个，{time.time()-t0:.0f} 秒")
-    d, app_off = parse(p)
+    d, app_off = parse(reader)
     bad = 0
     for pk, cid, label in items:
         st = state(d, app_off, pk, cid)

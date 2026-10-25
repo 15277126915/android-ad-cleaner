@@ -9,7 +9,7 @@ import json, os, platform, re, runpy, shutil, subprocess, sys, threading, time, 
 from pathlib import Path
 
 APP_NAME = "安卓去广告"
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 FROZEN = getattr(sys, "frozen", False)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOOL = os.path.join(BASE, "tool")
@@ -54,7 +54,13 @@ def cli_main():
     script, args = sys.argv[2], sys.argv[3:]
     sys.path.insert(0, TOOL)
     sys.argv = [os.path.join(TOOL, script)] + args
-    runpy.run_path(os.path.join(TOOL, script), run_name="__main__")
+    try:
+        runpy.run_path(os.path.join(TOOL, script), run_name="__main__")
+    except Exception:
+        # 保留完整原因；避免异常逸出 PyInstaller 后只剩「Failed to execute script app」。
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 # ---------- adb ----------
@@ -116,6 +122,7 @@ class Api:
         self.lock = threading.Lock()
         self.dl = {"state": "idle", "pct": 0, "msg": ""}
         self.last_status = None
+        self.last_error = None
 
     # ----- 基础 -----
     def env(self):
@@ -205,9 +212,12 @@ class Api:
             return {"error": (err or out)[-600:]}
 
     def chan_scan(self, serial):
-        out, err, rc = self._run("chan_fast.py", "-s", serial, "scan", timeout=120)
+        try:
+            out, err, rc = self._run("chan_fast.py", "-s", serial, "scan", timeout=120)
+        except (subprocess.TimeoutExpired, OSError) as e:
+            return self._remember_error("通知扫描", serial, str(e))
         if rc:
-            return {"error": (err or out or "通知扫描失败，请检查连接与权限")[-600:]}
+            return self._remember_error("通知扫描", serial, err or out or "通知扫描失败，请检查连接与权限")
         rows = []
         for line in out.splitlines():
             parts = line.split("\t")
@@ -215,6 +225,38 @@ class Api:
                 rows.append({"pkg": parts[0], "id": parts[1], "name": parts[2],
                              "checked": not SERVICE.search(line)})
         return rows
+
+    def _remember_error(self, operation, serial, detail):
+        # 本地保留完整异常，分享前替换序列号和用户目录；不再截掉异常开头。
+        for private, replacement in ((serial, "<序列号>"), (os.path.expanduser("~"), "<用户目录>")):
+            if private:
+                detail = detail.replace(private, replacement).replace(private.replace("\\", "\\\\"), replacement)
+        self.last_error = {"operation": operation, "detail": detail}
+        folder = os.path.join(DATA, "logs")
+        try:
+            os.makedirs(folder, exist_ok=True)
+            Path(folder, "last-error.txt").write_text(f"客户端 {VERSION} · {operation}\n{detail}\n", encoding="utf-8")
+        except OSError:
+            pass  # 保存日志失败也要让界面收到原始问题
+        lines = detail.splitlines()
+        causes = [line.strip() for line in lines if re.search(r"(?:Exception|Error|Caused by:|原始异常：|启动失败)", line)
+                  and not line.lstrip().startswith("at ")]
+        summary = "\n".join(causes[:4]) or (detail if len(detail) <= 600 else detail[:600] + "…")
+        if len(summary) > 1000:
+            summary = summary[:1000] + "…（完整原因见诊断）"
+        return {"error": summary, "detail": detail}
+
+    def ui_check(self, serial):
+        with self.lock:
+            if self.job and self.job["running"]:
+                return {"error": "任务正在执行，请结束后再检查读屏连接"}
+            try:
+                out, err, rc = self._run("run.py", "-s", serial, "ui-check", timeout=75)
+            except (subprocess.TimeoutExpired, OSError) as e:
+                return self._remember_error("读屏检查", serial, str(e))
+            if rc:
+                return self._remember_error("读屏检查", serial, err or out)
+            return {"ok": True, "message": out.strip()}
 
     # ----- 任务 -----
     def start(self, serial, plan):
@@ -258,6 +300,7 @@ class Api:
                 break
             j["idx"], j["title"] = i + 1, title
             self._log(f"\n▶ {title}")
+            line_start = len(j["lines"])
             t = time.time()
             if script == "@channels":
                 d = self._latest_backup(j["model"]) or os.path.join(BACKUPS, f"{j['model']}-gui")
@@ -281,9 +324,11 @@ class Api:
                 rc, tail = -1, [str(e)]
                 self._log(f"✗ {e}")
             j["results"].append({"title": title, "rc": rc, "sec": round(time.time() - t), "tail": tail})
+            if rc:
+                self._remember_error(title, j["serial"], "\n".join(j["lines"][line_start:]))
         j["running"] = False
         j["proc"] = None
-        self._log(f"\n全部完成，用时 {round(time.time() - j['t0'])} 秒" if not j["cancel"] else "\n已停止")
+        self._log(f"\n执行结束，用时 {round(time.time() - j['t0'])} 秒" if not j["cancel"] else "\n已停止")
 
     def poll(self, since=0):
         j = self.job
@@ -340,7 +385,7 @@ class Api:
             if not nm.upper().startswith((i.get("brand") or "").upper()):
                 nm = f"{i.get('brand')} {nm}"
             lines += [f"- 手机：{nm}（{i.get('model')}）",
-                      f"- 系统：{i.get('build')}，Android {i.get('android')}",
+                      f"- 系统：{i.get('os') or i.get('build')}（{i.get('build')}），Android {i.get('android')}",
                       f"- 机型脚本：{st.get('recipe') or '无'}"
                       + (f"（录制版本 {st.get('recipe_build')}，{'一致' if st.get('recipe_ok') else '不一致'}）" if st.get('recipe') else ""),
                       f"- 折叠屏展开：{'是' if st.get('fold_open') else '否'}；锁屏：{'是' if st.get('locked') else '否'}"]
@@ -356,6 +401,9 @@ class Api:
             if serial:
                 log = log.replace(serial, "<序列号>")
             lines.append("\n<details><summary>最近的日志</summary>\n\n```text\n" + log + "\n```\n</details>")
+        if self.last_error:
+            detail = self.last_error["detail"].replace("```", "~~~")
+            lines.append(f"\n<details><summary>最近失败的完整诊断：{self.last_error['operation']}</summary>\n\n```text\n{detail}\n```\n</details>")
         return "\n".join(lines)
 
     def copy_text(self, text):

@@ -3,6 +3,7 @@
 
   python3 tool/run.py devices                      列出连着的手机、型号、系统版本、有没有现成机型脚本
   python3 tool/run.py -s 序列号 check              只读：锁屏、机型脚本匹配、广告包挂起状态
+  python3 tool/run.py -s 序列号 ui-check           只读：检查手机读屏服务，不点击任何开关
   python3 tool/run.py -s 序列号 backup             改动前快照，存到 backups/<型号>-<时间>/
   python3 tool/run.py -s 序列号 recipe [段名 …]     跑本机型机型脚本（不带段名=全跑）
   python3 tool/run.py -s 序列号 chan-scan          只读：列出开着的营销通知渠道 → backups/.../channels.tsv
@@ -330,7 +331,10 @@ def main():
         sys.exit("命令格式：run.py -s <序列号> <命令>。先跑 run.py devices 看序列号")
     s, cmd, rest = a[1], a[2], a[3:]
 
-    if cmd == "check":
+    if cmd == "ui-check":
+        sys.exit(py("fast.py", "-s", s, "check"))
+
+    elif cmd == "check":
         i = info(s); r, ref = recipe_for(i["model"], i["brand"])
         print(f"机型：{i['name'] if i['name'].upper().startswith(i['brand'].upper()) else i['brand']+' '+i['name']}（{i['model']}），系统 {i['build']}，Android {i['android']}")
         print(f"锁屏：{'是（请机主解锁）' if locked(s) else '否'}")

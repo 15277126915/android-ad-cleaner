@@ -298,7 +298,8 @@ class DesktopTests(unittest.TestCase):
         spec.loader.exec_module(app)
         api = app.Api()
         api._run = Mock(return_value=("", "读取失败", 1))
-        self.assertEqual(api.chan_scan("test"), {"error": "读取失败"})
+        with tempfile.TemporaryDirectory() as directory, patch.object(app, "DATA", directory):
+            self.assertEqual(api.chan_scan("test"), {"error": "读取失败", "detail": "读取失败"})
 
     def test_gui_loads_file_uri_without_http_server(self):
         spec = importlib.util.spec_from_file_location("aac_gui_test", ROOT / "gui/app.py")
