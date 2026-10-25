@@ -251,7 +251,8 @@ class Api:
             if self.job and self.job["running"]:
                 return {"error": "任务正在执行，请结束后再检查读屏连接"}
             try:
-                out, err, rc = self._run("run.py", "-s", serial, "ui-check", timeout=75)
+                # 直接启动读屏进程，超时时终止它；不经额外父进程留下仍在连接的子任务。
+                out, err, rc = self._run("fast.py", "-s", serial, "check", timeout=75)
             except (subprocess.TimeoutExpired, OSError) as e:
                 return self._remember_error("读屏检查", serial, str(e))
             if rc:

@@ -119,7 +119,7 @@ class ErrorTests(unittest.TestCase):
         result = self.api.ui_check("test")
         self.assertIn("UiAutomation", result["detail"])
         self.assertIn("OS4.0.27", self.api.diagnostics())
-        self.api._run.assert_called_once_with("run.py", "-s", "test", "ui-check", timeout=75)
+        self.api._run.assert_called_once_with("fast.py", "-s", "test", "check", timeout=75)
 
     def test_read_screen_check_does_not_run_during_job(self):
         self.api.job = {"running": True}
