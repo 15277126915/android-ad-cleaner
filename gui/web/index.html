@@ -183,7 +183,8 @@ async function refreshDevices(){
   const box = $("#devbox"); if (!box) return;
   if (r.error && r.error !== "no-adb"){ box.innerHTML = `<div class="note bad">${esc(r.error)}</div>`; return; }
   if (!r.list.length){
-    box.innerHTML = `<div class="card"><div class="row"><span class="spin"></span><span>正在等待手机……插上数据线后这里会出现你的手机。</span></div></div>`;
+    box.innerHTML = `<div class="card"><div class="row"><span class="spin"></span><span>正在等待手机……插上数据线后这里会出现你的手机。</span></div>
+      <p class="lead" style="margin:12px 0 0">一直没有出现：换可传数据的数据线，确认 USB 调试授权；Windows 还需检查手机 USB 驱动。能连上但没有机型脚本，是另一种情况。仅支持通过 adb 连接的安卓设备，原生鸿蒙的 HDC 连接暂不支持。</p></div>`;
     $("#tutbox").open = true; return;
   }
   box.innerHTML = r.list.map(d => {
@@ -205,7 +206,7 @@ async function showDetect(){
   if (st.error){ main().innerHTML += `<div class="note bad">检测失败：${esc(st.error)}</div><div class="actions"><button class="btn plain" onclick="showConnect()">返回</button></div>`; return; }
   S.status = st;
   const i = st.info, name = i.name || (i.brand + " " + i.model);
-  const qa = st.quickapps, qaOff = qa.filter(q => q.suspended).length;
+  const qa = st.quickapps, qaOff = qa.filter(q => q.closed).length;
   const warns = [];
   if (st.locked) warns.push(`<div class="note warn">手机锁屏了。请解锁手机并保持亮屏，然后点「重新检测」。</div>`);
   const foldBlock = st.fold_open && st.steps.length > 0;
@@ -240,7 +241,7 @@ function openChecklist(){
 async function showChoose(){
   setStep(3);
   const st = S.status;
-  const qaOn = st.quickapps.filter(q => !q.suspended), adsOn = st.ads.filter(a => !a.suspended);
+  const qaOn = st.quickapps.filter(q => !q.closed), adsOn = st.ads.filter(a => !a.suspended);
   main().innerHTML = `<h1>选择要关的</h1><p class="lead">开始前会存一份改动前的快照，每一项都能在「还原改动」里恢复。</p>
     <div class="card"><h3>各 App 里的广告开关</h3>${st.steps.length ? `
       <label class="chk"><input type="checkbox" id="c-recipe" ${st.recipe_ref ? "" : "checked"} onchange="document.querySelectorAll('.stp').forEach(x=>x.checked=this.checked)"><span>${st.recipe_ref ? `试用同品牌参考脚本（${esc(st.recipe.split("/")[1] || "")} 录制）` : "按机型脚本自动关"}<small>${st.recipe_ref || !st.recipe_ok
@@ -253,14 +254,21 @@ async function showChoose(){
       <div id="chanbox"><div class="row" style="margin-top:10px"><span class="spin"></span>正在扫描通知渠道……</div></div></div>
     <div class="card"><h3>快应用</h3>${qaOn.length ? `
       <label class="chk"><input type="checkbox" id="c-qa"><span>关闭快应用（${qaOn.map(q => esc(q.name)).join("、")}）
-      <small>广告常用 hap:// 链接把人跳进快应用。关闭后这类跳转会弹「应用无法使用」。${qaOn.some(q => q.used) ? "检测到近期打开过，确认不是你主动在用。" : "近期没打开过，关掉对你没有影响。"}可还原。</small></span></label>`
+      <small>广告常用 hap:// 链接把人跳进快应用。关闭后系统会拦截这类入口；vivo 优先使用快应用服务开关，其他支持的机型使用挂起。${qaOn.some(q => q.used) ? "检测到近期打开过，确认不是你主动在用。" : "请确认常用服务不依赖快应用。"}可还原。</small></span></label>`
       : `<p class="lead" style="margin:0">${st.quickapps.length ? "快应用已经是关闭状态。" : "没有检测到快应用组件。"}</p>`}</div>
     <div class="card"><h3>系统广告组件</h3>${adsOn.length ? adsOn.map(a => `
       <label class="chk"><input type="checkbox" class="c-ad" value="${esc(a.pkg)}"><span>挂起 <code>${esc(a.pkg)}</code><small>${adName(a.pkg)}。挂起只是暂停运行，可还原，不影响系统更新。</small></span></label>`).join("")
       : `<p class="lead" style="margin:0">${st.ads.length ? "已经挂起。" : "没有已知的广告组件。"}</p>`}</div>
     <div class="note info">执行期间请保持手机亮屏、解锁、插着线，不要碰手机。</div>
     <div class="actions"><button class="btn plain" onclick="showDetect()">上一步</button><button class="btn" onclick="go()">开始执行</button></div>`;
-  if (!S.chans) S.chans = await api.chan_scan(S.serial);
+  if (!S.chans){
+    S.chanError = "";
+    try {
+      const result = await api.chan_scan(S.serial);
+      if (result.error){ S.chanError = result.error; S.chans = []; }
+      else S.chans = result;
+    } catch(e){ S.chanError = String(e); S.chans = []; }
+  }
   renderChans();
 }
 function adName(p){
@@ -268,7 +276,8 @@ function adName(p){
 }
 function renderChans(){
   const box = $("#chanbox"); if (!box) return;
-  if (!S.chans.length){ box.innerHTML = `<p class="lead" style="margin:10px 0 0">没有开着的营销通知渠道。</p>`; $("#chancount").textContent = ""; return; }
+  if (S.chanError){ box.innerHTML = `<div class="note bad">通知扫描未完成：${esc(S.chanError)}</div><button class="btn plain" onclick="S.chans=null;showChoose()">重新扫描</button>`; $("#chancount").textContent = ""; return; }
+  if (!S.chans.length){ box.innerHTML = `<p class="lead" style="margin:10px 0 0">未发现已创建且开启的营销候选渠道。新设备或刚重置的设备上，App 可能尚未创建渠道，正常使用后可再次扫描。</p>`; $("#chancount").textContent = ""; return; }
   box.innerHTML = `<div class="row" style="margin-top:10px"><button class="btn plain" onclick="chAll(true)">全选</button><button class="btn plain" onclick="chAll(false)">全不选</button></div>
     <div class="chan"><table>${S.chans.map((c, k) => `<tr><td style="width:28px"><input type="checkbox" class="ch" data-k="${k}" ${c.checked ? "checked" : ""} onchange="S.chans[${k}].checked=this.checked;chCount()"></td><td>${esc(c.name)}</td><td class="pkg">${esc(c.pkg)}</td></tr>`).join("")}</table></div>`;
   chCount();

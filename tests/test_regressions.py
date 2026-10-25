@@ -235,11 +235,11 @@ class LaunchTests(unittest.TestCase):
              patch.object(run, "recipe_for", return_value=("recipe.py", False)), \
              patch.object(run, "recipe_meta", return_value={"build": "OS4.0"}), \
              patch.object(run, "locked", return_value=False), \
-             patch.object(run, "sh", return_value="0") as sh, \
+             patch.object(run, "sh", return_value="15") as sh, \
              patch.object(run, "py", side_effect=RuntimeError("child failed")):
             with self.assertRaisesRegex(RuntimeError, "child failed"):
                 run.main()
-        self.assertEqual(sh.call_args.args, ("test", "settings put global stay_on_while_plugged_in 0"))
+        self.assertEqual(sh.call_args.args, ("test", "settings put global stay_on_while_plugged_in 15"))
 
 
 if __name__ == "__main__":

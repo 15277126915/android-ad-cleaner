@@ -103,7 +103,12 @@ class Phone:
                     if r - l > 0 and b - t > 0:
                         if shot is None:
                             shot = self.d.screenshot()
+                        # UI 坐标与截图可能来自不同分辨率/旋转状态。不能越界取样，也不能把未知状态当关。
+                        if shot.size != (self.W, self.H):
+                            continue
                         on = self._pixel_on(shot, l, t, r, b)
+                        if on is None:
+                            continue
                         n.set("checked", "true" if on else "false")
                         n.set("checkable", "true")
                         n.set("class", "SelfDrawnSwitch")
@@ -186,6 +191,9 @@ class Phone:
     @staticmethod
     def _pixel_on(img, l, t, r, b):
         """开关轨道取几个点：彩色（蓝/绿/橙，饱和度高）=开，灰白=关。"""
+        w, h = img.size
+        if not (0 <= l < r <= w and 0 <= t < b <= h):
+            return None
         img = img.convert("RGB")
         sat = 0
         for fx in (0.25, 0.5, 0.75):

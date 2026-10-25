@@ -17,7 +17,8 @@
   python3 tool/run.py -s 序列号 dev-off --yes      从电脑上关闭开发者模式和 USB 调试（执行后电脑与手机断开）
   python3 tool/run.py -s 序列号 status-json        只读：一次输出全部状态（JSON，给图形界面用）
 """
-import datetime, glob, os, re, shutil, subprocess, sys
+import datetime, glob, json, os, re, shutil, subprocess, sys
+from pathlib import Path
 for _st in (sys.stdout, sys.stderr):
     try:
         _st.reconfigure(encoding="utf-8", errors="replace")   # Windows 控制台默认不是 UTF-8
@@ -166,6 +167,54 @@ def installed(serial, pkg):
     return "package:" in sh(serial, f"pm path {pkg}")
 
 
+VIVO_QUICKAPP = "switch_quick_app_service"
+
+
+def quickapp_switch(serial):
+    if prop(serial, "ro.product.brand").lower() not in ("vivo", "iqoo"):
+        return None
+    value = sh(serial, f"settings --user 0 get secure {VIVO_QUICKAPP}")
+    return value if value in ("0", "1") else None
+
+
+def quickapp_setting_backup(serial):
+    """跨多次 backup 找回本设备未还原的记录；不借用另一台同型号手机的设置。"""
+    for path in sorted(glob.glob(os.path.join(BACKUPS, "*", "quickapp-setting.json")), reverse=True):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("serial") == serial and data.get("key") == VIVO_QUICKAPP and data.get("original") in ("0", "1"):
+            return path, data
+    return None, None
+
+
+def set_quickapp_service(serial, restore=False):
+    value = quickapp_switch(serial)
+    if value is None:
+        raise RuntimeError("读不到 vivo 快应用服务开关，未修改")
+    path, data = quickapp_setting_backup(serial)
+    if restore:
+        if data is None:
+            raise RuntimeError("没有找到本设备的快应用开关备份，未按默认值开启；请在手机上手动核对")
+        target = data["original"]
+    else:
+        if value == "0":
+            return "快应用服务已经关闭，未改动"
+        if path is None:
+            path = os.path.join(latest_backup(serial), "quickapp-setting.json")
+            # 先落盘再改设置；重复关闭不能把最初原值覆盖成 0。
+            with open(path, "x", encoding="utf-8") as f:
+                json.dump({"serial": serial, "key": VIVO_QUICKAPP, "original": value}, f)
+        target = "0"
+    sh(serial, f"settings --user 0 put secure {VIVO_QUICKAPP} {target}")
+    if quickapp_switch(serial) != target:
+        raise RuntimeError("快应用服务开关写入后校验失败，保留原值备份")
+    if restore:
+        os.remove(path)
+    else:
+        sh(serial, "am force-stop --user 0 com.vivo.hybrid")
+    return f"快应用服务{'已恢复原值 ' + target if restore else '已关闭'}"
+
+
 def quickapps(serial):
     """装着的快应用组件，带状态。"""
     ev = sh(serial, "dumpsys usagestats")
@@ -174,9 +223,14 @@ def quickapps(serial):
         if not installed(serial, pkg):
             continue
         fg = len(re.findall(rf"type=ACTIVITY_RESUMED package={re.escape(pkg)}\b", ev))
+        switch = quickapp_switch(serial) if pkg == "com.vivo.hybrid" else None
+        is_suspended = suspended(serial, pkg)
         out.append({
             "pkg": pkg, "name": name, "brand": brand, "tested": tested,
-            "suspended": suspended(serial, pkg),
+            "suspended": is_suspended,
+            "closed": is_suspended or switch == "0",
+            "method": "setting" if switch is not None else "suspend",
+            "service_switch": switch,
             "running": bool(sh(serial, f"pidof {pkg}") or sh(serial, f"pidof {pkg}:provider")),
             "used": fg,
         })
@@ -263,18 +317,19 @@ def main():
             exists = "package:" in sh(s, f"pm path {p}")
             print(f"  广告包 {p}：{'未安装' if not exists else ('已挂起' if suspended(s, p) else '未挂起')}")
         for q in quickapps(s):
-            print(f"  快应用 {q['pkg']}（{q['name']}）：{'已挂起' if q['suspended'] else '未挂起'}")
+            print(f"  快应用 {q['pkg']}（{q['name']}）：{'已关闭' if q['closed'] else '未关闭'}"
+                  f"（{'系统服务开关' if q['method'] == 'setting' else '挂起状态'}）")
         print(f"插电常亮：{sh(s, 'settings get global stay_on_while_plugged_in')}")
 
     elif cmd == "backup":
         d = latest_backup(s, create=True)
-        open(os.path.join(d, "info.txt"), "w", encoding="utf-8").write("\n".join(f"{k}={v}" for k, v in info(s).items()))
-        for name, c in [("sys.txt", "pm list packages -s"), ("user.txt", "pm list packages -3"),
-                        ("disabled.txt", "pm list packages -d"), ("notif.txt", "dumpsys notification --noredact")]:
-            open(os.path.join(d, name), "w", encoding="utf-8").write(sh(s, c))
+        Path(d, "info.txt").write_text("\n".join(f"{k}={v}" for k, v in info(s).items()), encoding="utf-8")
+        for name, c in [("sys.txt", "pm list packages --user 0 -s"), ("user.txt", "pm list packages --user 0 -3"),
+                        ("disabled.txt", "pm list packages --user 0 -d"), ("notif.txt", "dumpsys notification --noredact")]:
+            Path(d, name).write_text(sh(s, c), encoding="utf-8")
         st = "\n".join(f"## {n}\n" + sh(s, f"settings list {n}") for n in ("system", "secure", "global"))
-        open(os.path.join(d, "settings-before.txt"), "w", encoding="utf-8").write(st)
-        open(os.path.join(d, "stay_on.txt"), "w", encoding="utf-8").write(sh(s, "settings get global stay_on_while_plugged_in"))
+        Path(d, "settings-before.txt").write_text(st, encoding="utf-8")
+        Path(d, "stay_on.txt").write_text(sh(s, "settings get global stay_on_while_plugged_in"), encoding="utf-8")
         print(f"快照已存：{d.replace(os.path.expanduser('~'), '~') if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
 
     elif cmd == "recipe":
@@ -294,16 +349,20 @@ def main():
             sh(s, "settings put global stay_on_while_plugged_in 7")
             rc = py("fast.py", "-s", s, "run", r, *rest)
         finally:
-            sh(s, f"settings put global stay_on_while_plugged_in {stay_on if stay_on in ('0', '1', '2', '3', '4', '5', '6', '7') else '0'}")
+            sh(s, f"settings put global stay_on_while_plugged_in {int(stay_on) if stay_on.isdigit() else 0}")
         sys.exit(rc)
 
     elif cmd == "chan-scan":
         d = latest_backup(s)
-        out = subprocess.run(script_cmd("chan_fast.py", "-s", s, "scan"),
-                             capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+        result = subprocess.run(script_cmd("chan_fast.py", "-s", s, "scan"),
+                                capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if result.returncode:
+            print(result.stderr or result.stdout, file=sys.stderr)
+            sys.exit(result.returncode)
+        out = result.stdout
         f = os.path.join(d, "channels.tsv")
-        open(f, "w", encoding="utf-8").write(
-            "# 包名\t渠道id\t渠道名。人工核对：删掉服务类（热点共享、红包、防盗、直播提醒等）后再 chan-off\n" + out)
+        Path(f).write_text(
+            "# 包名\t渠道id\t渠道名。人工核对：删掉服务类（热点共享、红包、防盗、直播提醒等）后再 chan-off\n" + out, encoding="utf-8")
         print(out); print(f"候选清单：{os.path.relpath(f, ROOT)}（共 {out.count(chr(10))} 条）")
 
     elif cmd in ("chan-off", "chan-on"):
@@ -352,44 +411,62 @@ def main():
         if sub == "check":
             print(f"检测到 {len(qs)} 个快应用组件：")
             for q in qs:
-                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if q['suspended'] else '未挂起'}  "
+                print(f"  {q['name']:<10} {q['pkg']:<34} {'已关闭' if q['closed'] else '未关闭'}  "
                       f"{'后台在跑' if q['running'] else '没在跑'}  "
                       f"{'近期打开过 %d 次' % q['used'] if q['used'] else '近期没打开过'}"
-                      f"{'' if q['tested'] else '  （这个包的挂起效果还没实测）'}")
+                      f"{'  （系统服务开关）' if q['method'] == 'setting' else ('' if q['tested'] else '  （这个包的挂起效果还没实测）')}")
             h = sh(s, "pm query-activities --brief -a android.intent.action.VIEW -d hap://app/x")
             who = re.findall(r"^\s*(\S+/\S+)$", h, re.M)
-            if all(q["suspended"] for q in qs):
-                print("快应用已全部关闭。广告里的 hap:// 链接会弹「应用无法使用」，不会跳进快应用。恢复：quickapp on")
+            if all(q["closed"] for q in qs):
+                print("快应用组件已关闭；系统可能显示「应用无法使用」或「快应用服务已关闭」。恢复：quickapp on")
             else:
                 if who:
                     print(f"hap:// 链接由 {who[0]} 接管：网页或 App 里的广告可以用这类链接跳进快应用。")
                 print("关闭：python3 tool/run.py -s %s quickapp off（要机主同意，可还原）" % s)
         elif sub == "off":
-            todo = [q["pkg"] for q in qs if not q["suspended"]]
+            todo = [q["pkg"] for q in qs if not q["closed"] and q["method"] == "suspend"]
             why = {}
+            for q in qs:
+                if q["method"] == "setting":
+                    try:
+                        print(set_quickapp_service(s))
+                    except (RuntimeError, OSError, ValueError) as e:
+                        why[q["pkg"]] = str(e)
             for p in todo:
-                sh(s, f"am force-stop {p}")
                 why[p] = sh_all(s, f"pm suspend --user 0 {p}")
+                if suspended(s, p):
+                    sh(s, f"am force-stop --user 0 {p}")
             done = [p for p in todo if suspended(s, p)]
             record(s, done)
             bad = []
-            for q in qs:
-                ok = suspended(s, q["pkg"])
+            for q in quickapps(s):
+                ok = q["closed"]
                 reason = "" if ok else "（" + ((why.get(q["pkg"]) or "").splitlines() or ["系统没给原因"])[-1][:160] + "）"
-                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if ok else '挂起失败' + reason}")
+                print(f"  {q['name']:<10} {q['pkg']:<34} {'已关闭' if ok else '关闭失败' + reason}")
                 if not ok:
                     bad.append(q)
             if not bad:
-                print("快应用已关闭。广告里的 hap:// 链接会弹「应用无法使用」，不会跳进快应用。恢复：quickapp on")
+                print("快应用组件已关闭。请按常用入口核对效果；恢复：quickapp on")
             else:
                 # Issue #7：vivo 的快应用挂起被系统拒绝。如实报失败，不说「已关闭」
-                print(f"有 {len(bad)} 个快应用组件挂起失败，这台系统不让挂起它。可以在手机上关掉它的通知："
+                print(f"有 {len(bad)} 个快应用组件关闭失败。可以在手机上检查快应用服务开关，或仅关掉它的通知："
                       "设置 → 通知 → 找到「" + "」「".join(q["name"] for q in bad) + "」→ 关掉「允许通知」。")
                 sys.exit(1)
         elif sub == "on":
+            failures = 0
             for q in qs:
-                sh(s, f"pm unsuspend --user 0 {q['pkg']}")
-                print(f"  {q['name']:<10} {q['pkg']:<34} {'已挂起' if suspended(s, q['pkg']) else '已恢复'}")
+                if q["method"] == "setting":
+                    try:
+                        print(set_quickapp_service(s, restore=True))
+                    except (RuntimeError, OSError, ValueError) as e:
+                        print(f"  ✗ {e}"); failures += 1
+                if q["suspended"]:
+                    sh(s, f"pm unsuspend --user 0 {q['pkg']}")
+                    failed = suspended(s, q['pkg'])
+                    failures += failed
+                    print(f"  {q['name']}: {'还原挂起失败' if failed else '已解除挂起'}")
+            if failures:
+                sys.exit(1)
         else:
             sys.exit("quickapp 后面跟 check / off / on")
 

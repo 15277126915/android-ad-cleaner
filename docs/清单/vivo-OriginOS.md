@@ -73,14 +73,15 @@
 vivo 推送分类的渠道：`VPushChannel_0`（运营消息）、`VPushChannel_4`（精彩消息）、`VPushChannel_6`（推荐消息）。
 
 - 🔴 支付宝运营、精彩；抖音运营、推荐；云服务推送；使用技巧智能推送建议；Play 特惠；Edge 热门资讯、突发新闻
-- ⚠️ 渠道直达参数在 vivo 上无效，打开的是 App 通知总页，要在总页里按渠道名点进去。当前源码的客户端和 `chan-off` 会尝试这样做（Issue #7），0.2.0 安装包尚未包含该处理。
+- ⚠️ 最新 OriginOS 7 社区实测发现，`com.vivo.systemuiplugin` 页面的「允许通知」是应用级总开关，关闭会连订单、聊天通知一起关。当前源码在这个页面直接跳过，不继续按渠道操作；不能把它当作安全的渠道回退入口。依据 [PR #20](https://github.com/rddmwmddr/android-ad-cleaner/pull/20)，待其他版本逐一核实。
 - ⚠️ 渠道页由 `com.vivo.systemuiplugin` 处理，不要强行停止它。
 
 ## 10. 广告包和快应用
 
 这台没有挂起任何包，App 内开关够用。
 
-- ⚠️ 快应用 `com.vivo.hybrid`：X300 Ultra（V2547A，Android 17）上系统拒绝挂起（[Issue #7](https://github.com/rddmwmddr/android-ad-cleaner/issues/7)）。在手机上关掉它的通知：设置 → 通知与状态栏 → 应用通知管理 → 快应用 → 关掉「允许通知」。
+- ⚠️ 快应用 `com.vivo.hybrid`：X300 Ultra（V2547A，Android 17）上系统拒绝挂起（[Issue #7](https://github.com/rddmwmddr/android-ad-cleaner/issues/7)）。根据 [PR #20](https://github.com/rddmwmddr/android-ad-cleaner/pull/20) 的真机证据，当前源码在能读到 `switch_quick_app_service` 时，通过系统服务开关关闭并验证，先备份原值；`quickapp on` 按本设备备份还原，找不到备份不会直接写成开启。本仓库尚未用 vivo 真机复测这版实现。
+- 🟢 智慧生活 `com.vivo.vhome` 属于智能家居功能，即使注册了 `hap://` 入口也不作为快应用广告组件处理。
 
 ---
 

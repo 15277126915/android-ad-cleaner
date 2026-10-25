@@ -6,6 +6,7 @@
 打包后没有独立的 Python，子进程用「本程序 --cli 脚本名 参数…」的方式启动。
 """
 import json, os, platform, re, runpy, shutil, subprocess, sys, threading, time, urllib.request, zipfile
+from pathlib import Path
 
 APP_NAME = "安卓去广告"
 VERSION = "0.2.0"
@@ -205,6 +206,8 @@ class Api:
 
     def chan_scan(self, serial):
         out, err, rc = self._run("chan_fast.py", "-s", serial, "scan", timeout=120)
+        if rc:
+            return {"error": (err or out or "通知扫描失败，请检查连接与权限")[-600:]}
         rows = []
         for line in out.splitlines():
             parts = line.split("\t")
@@ -380,17 +383,60 @@ class Api:
         webbrowser.open(urllib.parse.quote(url, safe=":/?#[]@!$&'()*+,;=%~"))
 
 
+def smoke_gui(window, result):
+    """只验证本地页面、图片和 JS→Python 桥；不连接或修改手机。"""
+    try:
+        if not window.events.loaded.wait(30):
+            raise RuntimeError("页面加载超时")
+        deadline = time.monotonic() + 25
+        while time.monotonic() < deadline:
+            ready = window.evaluate_js("typeof api !== 'undefined' && !!api && !!document.querySelector('#tutbox')")
+            if ready:
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("JS API 桥初始化超时")
+        window.evaluate_js("window.__smokeEnv = null; api.env().then(x => window.__smokeEnv = x.version)")
+        while time.monotonic() < deadline:
+            report = window.evaluate_js("({url: location.href, version: window.__smokeEnv, images: [...document.querySelectorAll('#tutbox img')].every(i => i.complete && i.naturalWidth > 0)})")
+            if report.get("version") == VERSION and report.get("images") and report.get("url", "").startswith("file://"):
+                from webview import http
+                if http.global_server is not None:
+                    raise RuntimeError("不应启动本地 HTTP 服务")
+                result["ok"] = True
+                print("GUI smoke: file 页面、教程图片、JS API 桥通过；未启动 HTTP 服务", flush=True)
+                return
+            time.sleep(0.1)
+        raise RuntimeError("教程图片或 JS API 调用未通过")
+    except Exception as e:
+        print(f"GUI smoke failed: {e}", file=sys.stderr, flush=True)
+    finally:
+        window.destroy()
+
+
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "--cli":
         cli_main(); return
     import webview
     api = Api()
-    w = webview.create_window(APP_NAME, os.path.join(BASE, "gui", "web", "index.html"), js_api=api,
+    smoke = "--smoke-gui" in sys.argv
+    if smoke:
+        _fix_stdio()
+        api.adb = None                     # 不枚举真机，不自动下载 adb
+    result = {"ok": False}
+    # 明确 file://：裸文件路径会启动 Bottle HTTP 服务，部分 Windows 环境回环连接超时（#18）。
+    url = Path(BASE, "gui", "web", "index.html").resolve().as_uri()
+    w = webview.create_window(APP_NAME, url, js_api=api, hidden=smoke,
                               width=1080, height=780, min_size=(900, 640))
+    options = {"debug": "--debug" in sys.argv, "http_server": False}
+    if smoke:
+        options.update(func=smoke_gui, args=(w, result))
     if IS_WIN:
         try:
-            webview.start(gui="edgechromium", debug="--debug" in sys.argv)
+            webview.start(gui="edgechromium", **options)
         except Exception as e:      # 缺 WebView2 运行时（部分 Windows 10）
+            if smoke:
+                raise
             import ctypes, webbrowser
             url = "https://developer.microsoft.com/microsoft-edge/webview2/"
             ctypes.windll.user32.MessageBoxW(0, "这台电脑缺少微软 Edge WebView2 运行时，界面没法显示。\n\n"
@@ -398,7 +444,9 @@ def main():
                                                 f"（{e}）", APP_NAME, 0x40)
             webbrowser.open(url)
     else:
-        webview.start(debug="--debug" in sys.argv)
+        webview.start(**options)
+    if smoke:
+        sys.exit(0 if result["ok"] else 1)
 
 
 if __name__ == "__main__":
