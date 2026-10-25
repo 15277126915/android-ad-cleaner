@@ -272,6 +272,18 @@ class BackupTests(unittest.TestCase):
 
 
 class DesktopTests(unittest.TestCase):
+    def test_gui_smoke_output_works_with_non_utf8_console(self):
+        spec = importlib.util.spec_from_file_location("aac_gui_test", ROOT / "gui/app.py")
+        app = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(app)
+        buffer = io.BytesIO()
+        stream = io.TextIOWrapper(buffer, encoding="ascii")
+        with patch.object(sys, "stdout", stream), patch.object(sys, "stderr", stream):
+            app._fix_stdio()
+            print("GUI smoke: 页面通过")
+            stream.flush()
+        self.assertEqual(buffer.getvalue().decode("utf-8"), "GUI smoke: 页面通过\n")
+
     def test_failed_scan_reaches_gui_as_error(self):
         spec = importlib.util.spec_from_file_location("aac_gui_test", ROOT / "gui/app.py")
         app = importlib.util.module_from_spec(spec)
