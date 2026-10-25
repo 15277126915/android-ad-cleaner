@@ -358,9 +358,9 @@ function showDone(r){
   const ok = r.results.every(x => x.rc === 0) && !r.cancel;
   if (!r.results.length){ r.results = []; }
   main().innerHTML = `<h1>${ok ? "完成" : "已结束（有步骤没成功）"}</h1><p class="lead">用时 ${r.sec} 秒。去下拉搜索、负一屏、应用商店、浏览器看一眼，确认功能正常。</p>
-    <div class="card ${r.results.length ? "" : "hide"}">${r.results.map(x => `<div class="res"><span class="tag ${x.rc === 0 ? "ok" : "bad"}">${x.rc === 0 ? "成功" : "失败"}</span><span class="t">${esc(x.title)}</span><span class="d">${esc(summarize(x))} · ${x.sec} 秒</span></div>`).join("")}</div>
+    <div class="card ${r.results.length ? "" : "hide"}">${r.results.map(x => `<div class="res"><span class="tag ${x.rc === 0 ? "ok" : "bad"}">${x.skipped ? "跳过" : x.rc === 0 ? "成功" : "失败"}</span><span class="t">${esc(x.title)}</span><span class="d">${esc(summarize(x))} · ${x.sec} 秒</span></div>`).join("")}</div>
     <div class="card"><h3>最后一步：关闭开发者模式</h3>
-      <p class="lead" style="margin:0 0 12px">开发者模式和 USB 调试用不到了，建议关掉：部分银行、支付、游戏 App 检测到它开着会提醒或拒绝运行；关掉后别人拿你的手机插电脑也连不上。<br>关掉<b>不会撤销</b>这次的改动。</p>
+      <p class="lead" style="margin:0 0 12px">${ok ? "核对结果后，若不再使用电脑调试，建议关闭开发者模式和 USB 调试。" : "有步骤未成功；若还要排查或重试，请先保留 USB 调试。结束排查后再关闭。"}部分银行、支付、游戏 App 检测到它开着会提醒或拒绝运行。<br>关掉<b>不会撤销</b>已经成功的改动。</p>
       <div class="row"><button class="btn" onclick="askDevOff()">帮我关闭</button><button class="btn plain" onclick="selfOff()">我在手机上自己关</button></div></div>
     ${ok ? "" : `<div class="note bad">有步骤没成功。<a href="#" onclick="openFeedback('bug');return false">反馈这个问题</a>，会附上这次的日志，方便定位。</div>`}
     <details class="card"><summary>查看完整日志</summary><div class="log" style="height:260px">${esc(document.querySelector("#log")?.textContent || "")}</div></details>`;

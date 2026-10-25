@@ -15,7 +15,7 @@ else
 fi
 if [ ! -x $VENV/bin/python ]; then
   uv venv --python $PYVER $VENV
-  uv pip install --python $VENV/bin/python pywebview pyinstaller uiautomator2 pillow
+  uv pip install --python $VENV/bin/python -r requirements.txt pywebview pyinstaller pillow
 fi
 PY=$VENV/bin/python
 VER=$($PY -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('gui/app.py', encoding='utf-8').read()).group(1))")
@@ -30,7 +30,7 @@ $RUN $PY -m PyInstaller --noconfirm --windowed --name "$NAME" \
   --add-data "$DATA/tool:tool" --add-data "$DATA/recipes:recipes" \
   --add-data "$DATA/images:images" --add-data "$DATA/gui/web:gui/web" \
   --collect-all uiautomator2 --collect-all adbutils \
-  --hidden-import uiautomator2 --hidden-import adbutils --hidden-import PIL \
+  --hidden-import uiautomator2 --hidden-import adbutils --hidden-import PIL --hidden-import fcntl \
   gui/app.py >/dev/null 2>gui/build/pyinstaller-$ARCH.log
 APP="$OUT/$NAME.app"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VER" "$APP/Contents/Info.plist"

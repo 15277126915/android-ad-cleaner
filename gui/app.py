@@ -9,7 +9,7 @@ import json, os, platform, re, runpy, shutil, subprocess, sys, threading, time, 
 from pathlib import Path
 
 APP_NAME = "安卓去广告"
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 FROZEN = getattr(sys, "frozen", False)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOOL = os.path.join(BASE, "tool")
@@ -296,11 +296,18 @@ class Api:
 
     def _work(self, tasks):
         j = self.job
+        ui_busy = False
         for i, (title, script, args) in enumerate(tasks):
             if j["cancel"]:
                 break
             j["idx"], j["title"] = i + 1, title
             self._log(f"\n▶ {title}")
+            needs_ui = script == "@channels" or (script == "run.py" and len(args) > 2 and args[2] == "recipe")
+            if ui_busy and needs_ui:
+                reason = "读屏服务仍被占用，跳过本步骤；请先解决读屏连接再重试。"
+                self._log(reason)
+                j["results"].append({"title": title, "rc": 3, "skipped": True, "sec": 0, "tail": [reason]})
+                continue
             line_start = len(j["lines"])
             t = time.time()
             if script == "@channels":
@@ -326,7 +333,9 @@ class Api:
                 self._log(f"✗ {e}")
             j["results"].append({"title": title, "rc": rc, "sec": round(time.time() - t), "tail": tail})
             if rc:
-                self._remember_error(title, j["serial"], "\n".join(j["lines"][line_start:]))
+                detail = "\n".join(j["lines"][line_start:])
+                ui_busy = ui_busy or "UIAUTOMATION_BUSY" in detail or "DeviceBusyError" in detail
+                self._remember_error(title, j["serial"], detail)
         j["running"] = False
         j["proc"] = None
         self._log(f"\n执行结束，用时 {round(time.time() - j['t0'])} 秒" if not j["cancel"] else "\n已停止")
@@ -396,7 +405,8 @@ class Api:
         if j:
             lines.append("\n**执行结果**\n")
             for r in j["results"]:
-                lines.append(f"- {r['title']}：{'成功' if r['rc'] == 0 else '失败（退出码 %s）' % r['rc']}，{r['sec']} 秒")
+                state = "跳过（读屏服务被占用）" if r.get("skipped") else ("成功" if r["rc"] == 0 else "失败（退出码 %s）" % r["rc"])
+                lines.append(f"- {r['title']}：{state}，{r['sec']} 秒")
             tail = [l for l in j["lines"] if l.strip()][-60:]
             log = "\n".join(tail)
             if serial:

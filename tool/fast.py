@@ -18,6 +18,7 @@ for _st in (sys.stdout, sys.stderr):
     except Exception:
         pass
 import uiautomator2 as u2
+from ui_session import connect
 
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 DISMISS = ("以后再说", "暂不更新", "暂不", "取消", "我知道了", "跳过", "禁止", "不再提示")
@@ -47,17 +48,37 @@ class Phone:
         if log:
             print("正在连接手机读屏服务……", flush=True)
         try:
-            self.d = u2.connect(serial)
+            self.d = connect(serial)
+        except u2.exceptions.AccessibilityServiceAlreadyRegisteredError as e:
+            raise RuntimeError("UIAUTOMATION_BUSY：手机读屏服务已被占用，本次未点击开关。"
+                               "已清理本次失败的启动并重试一次，仍无法连接。"
+                               "请退出旧版客户端、Appium 或其他正在操作同一手机的自动化工具后重试；"
+                               "仍失败请手动重启手机，解锁后只打开一个客户端，再点「检查读屏连接」。"
+                               "无需关闭手机无障碍服务，也无需重装应用或清除数据。\n"
+                               f"原始异常：{type(e).__name__}: {e}") from e
         except u2.exceptions.UiAutomationError as e:
             raise RuntimeError("手机读屏服务（UiAutomation）启动失败，本次未点击开关。"
                                "请保持手机解锁，退出正在操作同一手机的其他自动化程序后重试；"
                                "仍失败时请复制完整诊断，不能仅凭堆栈末尾判断原因。\n"
                                f"原始异常：{type(e).__name__}: {e}") from e
-        self.d.settings["operation_delay"] = (0, 0)
-        self.W, self.H = self.d.window_size()
+        try:
+            self.d.settings["operation_delay"] = (0, 0)
+            self.W, self.H = self.d.window_size()
+        except BaseException:
+            self.d.close()
+            raise
         self.log = log
         self.changed = []          # (页面, 标题) 记录本次关掉的
         self.miss = 0              # 本段已经没找到几次；>0 说明路径对不上，后面只看当前屏、不再翻页找
+
+    def close(self):
+        self.d.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
     def say(self, *a):
         if self.log:
@@ -611,7 +632,11 @@ def main():
         print(__doc__); return
     if len(a) < 3 or a[0] != "-s":
         print(__doc__); sys.exit(1)
-    p = Phone(a[1]); cmd, rest = a[2], a[3:]
+    with Phone(a[1]) as p:
+        execute(p, a[2], a[3:])
+
+
+def execute(p, cmd, rest):
     if cmd == "check":
         if p.locked():
             sys.exit("手机锁屏了，请机主解锁后重试")

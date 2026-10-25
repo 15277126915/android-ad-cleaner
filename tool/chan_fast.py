@@ -213,24 +213,28 @@ def main():
         d, app_off = parse(reader)
         p = None
         t0 = time.time(); n = 0; failures = 0
-        for pk, cid, label in items:
-            st = state(d, app_off, pk, cid)
-            if st in ("--", "del", "app"):
-                print(f"  · 未操作 {label}（渠道不存在、已删除或应用通知已关闭）")
-                if want or st == "--":
-                    failures += 1
-                continue
-            if (st == "off") == (not want):
-                continue
-            if p is None:
-                print("正在连接手机读屏服务……", flush=True)
-                p = Phone(serial, log=False)
-            err = toggle(p, pk, cid, want, d[(pk, cid)][0])
-            n += 1
-            failures += bool(err)
-            print(f"  {'✗ '+err if err else ('开' if want else '关')}  {label}")
-        if p is not None:
-            p.d.shell("input keyevent HOME")   # 只读 / 无需改动时不操作手机页面
+        try:
+            for pk, cid, label in items:
+                st = state(d, app_off, pk, cid)
+                if st in ("--", "del", "app"):
+                    print(f"  · 未操作 {label}（渠道不存在、已删除或应用通知已关闭）")
+                    if want or st == "--":
+                        failures += 1
+                    continue
+                if (st == "off") == (not want):
+                    continue
+                if p is None:
+                    print("正在连接手机读屏服务……", flush=True)
+                    p = Phone(serial, log=False)
+                err = toggle(p, pk, cid, want, d[(pk, cid)][0])
+                n += 1
+                failures += bool(err)
+                print(f"  {'✗ '+err if err else ('开' if want else '关')}  {label}")
+            if p is not None:
+                p.d.shell("input keyevent HOME")   # 只读 / 无需改动时不操作手机页面
+        finally:
+            if p is not None:
+                p.close()
         print(f"拨了 {n} 个，{time.time()-t0:.0f} 秒")
     d, app_off = parse(reader)
     bad = 0

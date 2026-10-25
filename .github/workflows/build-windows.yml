@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: 安装依赖
-        run: pip install pywebview pyinstaller uiautomator2 pillow
+        run: pip install -r requirements.txt pywebview pyinstaller pillow
       - name: 设备无关回归测试
         run: |
           $env:ADB = "$env:ANDROID_HOME\platform-tools\adb.exe"
