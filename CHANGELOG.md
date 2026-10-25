@@ -40,6 +40,7 @@
 | Mac Apple 芯片本地测试包 | 构建成功，启动与设备识别冒烟测试通过；打包后的 `run.py → chan_fast.py` 只读扫描通过；关键打包源码与工作区一致 |
 | 本轮 Mac 原生 GUI | `--smoke-gui` 验证本地页面、五张教程图片、JS → Python 通信正常，确认没有启动 HTTP 服务；测试不连接手机 |
 | Android 15 模拟器渠道操作 | 独立测试应用的营销渠道 `ON → off → ON` 通过；服务渠道和应用通知总开关保持原值，模拟器插电常亮已还原。测试发现启动过渡期间会短暂出现空页面，已增加连续稳定读屏后再点击 |
+| Windows 云端构建与 GUI | [Actions #40181971272](https://github.com/rddmwmddr/android-ad-cleaner/actions/runs/40181971272) 全部通过：50 项回归、PyInstaller 打包、内置命令行、原生 GUI / 教程图片 / JS API、安装程序及便携版生成。验证代码提交 `5eeb75c`；测试产物未作为新 Release 发布 |
 
 测试命令（已安装根目录 `requirements.txt` 的 Python 环境）：
 
@@ -47,11 +48,11 @@
 python -m unittest discover -s tests -v
 ```
 
-真机结果仅代表上述机型和版本。没有完成 vivo 整段脚本、新版 Windows 客户端或 Intel Mac 真机回归，也没有把 Mac 本地测试包作为公开安装包发布。测试收尾已恢复手机原来的插电常亮设置。
+真机结果仅代表上述机型和版本。没有完成 vivo 整段脚本、Windows 连接手机及报告者电脑复测、Intel Mac 真机回归，也没有把测试包作为公开安装包发布。测试收尾已恢复原来的插电常亮设置。
 
 ### 仍待处理
 
-- Windows #18 已实现避开本地 HTTP 服务的启动修复；报告问题的 Windows 11 电脑仍需复测，0.2.0 安装包不会自动获得修复。
+- Windows #18 的启动修复已通过云端原生 GUI 验证；报告问题的 Windows 11 电脑仍需复测，0.2.0 安装包不会自动获得修复。
 - [PR #10](https://github.com/rddmwmddr/android-ad-cleaner/pull/10)：社区提供的 vivo OriginOS 7 适配尚未合并；当前 OriginOS 6 参考脚本不代表 OriginOS 7 已验证。
 - [PR #19](https://github.com/rddmwmddr/android-ad-cleaner/pull/19) / [PR #20](https://github.com/rddmwmddr/android-ad-cleaner/pull/20) 的问题已按当前引擎重新实现修复并补测试；没有整单合并，也没有引入整包关闭通知的命令。HyperOS / vivo / 荣耀对应手机的新版回归仍待完成。
 - 所有已拉取 Issue 的处理范围、证据和待验证项见 [社区问题处理记录](docs/09-社区问题处理.md)，其中原生鸿蒙、缺少诊断的新机型不会标成已适配。
