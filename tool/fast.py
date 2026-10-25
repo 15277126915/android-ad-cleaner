@@ -56,7 +56,10 @@ class Phone:
 
     # ---------- 读屏 ----------
     def tree(self):
-        return ET.fromstring(self.d.dump_hierarchy())
+        root = ET.fromstring(self.d.dump_hierarchy())
+        # Mi 10 的热榜子页会横屏；不能一直用连接时的竖屏尺寸过滤节点。
+        self.W, self.H = self.d.window_size()
+        return root
 
     def focus(self):
         """当前焦点窗口（~0.1 秒；u2 的 app_current 在浮窗上会卡 10 秒）。"""
@@ -210,6 +213,12 @@ class Phone:
 
     # ---------- 动作 ----------
     def click(self, x, y):
+        size = self.d.window_size()
+        if tuple(size) != (self.W, self.H):
+            self.W, self.H = size
+            raise RuntimeError("屏幕方向或尺寸已变化，停止使用旧坐标；请重新读取页面")
+        if not (0 <= x < self.W and 0 <= y < self.H):
+            raise RuntimeError("点击坐标在屏幕外，未操作")
         self.d.shell(f"input swipe {x} {y} {x} {y} 80")   # 有的 App 吞 input tap
 
     def scroll(self, frac=0.45, up=False):

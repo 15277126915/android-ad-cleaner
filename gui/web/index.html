@@ -151,6 +151,7 @@ function showConnect(){
   main().innerHTML = `
     <h1>连接手机</h1>
     <p class="lead">用数据线把手机连到这台电脑。手机要打开开发者模式和 USB 调试。</p>
+    <div class="note info"><b>设备支持范围</b>：支持通过 adb 连接的安卓设备。使用 HDC 的华为原生鸿蒙暂不支持；升级客户端也不会获得鸿蒙适配。荣耀 MagicOS 属于另一种情况，可先连接检测，没有本型号脚本时可自选同品牌参考脚本。</div>
     <div id="adbbox"></div>
     <div id="devbox"></div>
     <details class="card" id="tutbox">
@@ -272,7 +273,7 @@ async function showChoose(){
   renderChans();
 }
 function adName(p){
-  return {"com.opos.ads":"OPPO 广告服务","com.heytap.pictorial":"OPPO 乐划锁屏（锁屏杂志）","com.miui.systemAdSolution":"小米系统广告组件，负责天气、日历、商店等系统 App 里的广告。挂起后再禁止它联网，只挂起拦不住"}[p] || "系统广告组件";
+  return {"com.opos.ads":"OPPO 广告服务","com.heytap.pictorial":"OPPO 乐划锁屏（锁屏杂志）","com.miui.systemAdSolution":"小米系统广告组件。尝试挂起并禁止联网；旧系统可能不支持断网，会报告部分完成，开屏广告也可能仍出现"}[p] || "系统广告组件";
 }
 function renderChans(){
   const box = $("#chanbox"); if (!box) return;

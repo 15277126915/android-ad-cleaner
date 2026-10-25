@@ -25,15 +25,17 @@ def step(name):
     return deco
 
 
-def gear():
+def gear(toolbar_only=False):
     """很多小米 App 的设置是右上角齿轮图标，没有文字。"""
     for n in p.tree().iter("node"):
-        d = (n.get("content-desc") or "") + (n.get("resource-id") or "")
-        if any(k in d.lower() for k in ("设置", "setting")) and not any(k in d.lower() for k in ("更多", "more")) and n.get("clickable") == "true" and p.on_screen(n):
-            from fast import bounds
-            l, t, r, b = bounds(n); p.click((l + r) // 2, (t + b) // 2); time.sleep(1)
+        d = (n.get("content-desc") or "") + (n.get("resource-id") or "") + (n.get("text") or "")
+        from fast import bounds
+        l, t, r, b = bounds(n)
+        icon = "ImageView" in n.get("class", "") and r-l < p.W * 0.25 and b-t < p.H * 0.15
+        if any(k in d.lower() for k in ("设置", "setting")) and not any(k in d.lower() for k in ("更多", "more")) and (n.get("clickable") == "true" or icon) and p.on_screen(n) and (not toolbar_only or b < p.H * 0.23):
+            p.click((l + r) // 2, (t + b) // 2); time.sleep(1)
             return True
-    if p.find("设置", exact=True, edge_ok="tab"):
+    if not toolbar_only and p.find("设置", exact=True, edge_ok="tab"):
         return p.tap("设置", exact=True, scrolls=0)
     # 下载管理、天气和日历的齿轮藏在右上「更多」菜单里。
     for n in p.tree().iter("node"):
@@ -45,6 +47,19 @@ def gear():
             if p.tap("设置", exact=True, scrolls=0):
                 return True
             break
+    return False
+
+
+def browser_settings():
+    """先看工具栏，再点底部「我的」；不把资讯正文里的「我的」当导航标签。"""
+    if gear(toolbar_only=True):
+        return True
+    for text, (l, t, r, b), node in p.texts():
+        if text == "我的" and t >= p.H * 0.65:
+            before = p.sig()
+            p.click((l + r) // 2, (t + b) // 2)
+            p.settle(before, 1.5)
+            return gear()
     return False
 
 
@@ -136,8 +151,8 @@ def _():
 def _():
     # 首页「默认 / 探索版 / 自定义主页」不改：自定义主页要填网址，按机主喜好
     p.start("com.android.browser")
-    p.go("我的", "设置")
-    gear()
+    if not browser_settings():
+        raise RuntimeError("浏览器设置入口未找到；未点击正文中的文字")
     if maybe("隐私和安全"):
         p.off(only=["个性化内容推荐", "个性化广告推荐"], page="浏览器·隐私和安全"); p.back()
     for page, only in [("主页设置", ["宫格位推送"]), ("搜索设置", ["猜你想搜"]), ("功能设置", ["小说"])]:
@@ -157,14 +172,15 @@ def _():
         if maybe("应用推荐"):
             p.off(only=["推荐未安装应用"], keep=["展示常用应用"], page="搜索·应用推荐"); p.back()
         if maybe("热搜榜单"):
-            # 新版：热搜榜单 → 我的热榜 → 热搜 / 生活 / 话题，三个二级页里才是开关（Issue #2）
+            # Mi 10 同页既有「推荐」开关又有热搜/娱乐/话题子页，二者都要处理（Issue #21）。
             subs = [x for x in ("热搜", "生活", "话题", "娱乐") if p.find(x, exact=True)]
-            if subs and not p.switches():
-                for x in subs:
-                    if maybe(x, scrolls=0):
-                        p.off(only=HOT, page=f"搜索·热榜·{x}"); p.back()
-            else:                                 # 旧版：开关直接在这一页
+            if p.switches():
                 p.off(only=HOT, page="搜索·热搜榜单")
+            if subs:
+                p.top()
+                for x in subs:
+                    if maybe(x):
+                        p.off(only=HOT, page=f"搜索·热榜·{x}"); p.back()
             p.back()
         p.back()
     p.back(2)
@@ -190,5 +206,5 @@ def _():
         if not gear():
             print("  · 本版本没有可识别的设置菜单，跳过"); continue
         if maybe("用户体验计划"):
-            p.off(only=["推荐", "广告", "个性化", "内容推广"], page=f"{pkg}·用户体验计划"); p.back()
+            p.off(only=["推荐", "广告", "个性化", "内容推广", "天气视频卡片"], page=f"{pkg}·用户体验计划"); p.back()
         p.back(3)

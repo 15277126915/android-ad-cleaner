@@ -4,7 +4,7 @@
 #   ARCH=x86_64 gui/build_mac.sh          Intel 版（在 Apple 芯片的 Mac 上要装 Rosetta）
 #   SIGN_ID="Developer ID Application: 名字 (TEAMID)" NOTARY_PROFILE=钥匙串公证配置名 gui/build_mac.sh
 # 产物：gui/dist/<架构>/安卓去广告.app、gui/dist/AndroidAdCleaner-<版本>-mac-<arm64|intel>.dmg
-set -e
+set -eo pipefail
 cd "${0:A:h}/.."
 ARCH=${ARCH:-arm64}
 NAME="安卓去广告"
@@ -21,12 +21,14 @@ PY=$VENV/bin/python
 VER=$($PY -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('gui/app.py', encoding='utf-8').read()).group(1))")
 OUT=gui/dist/$ARCH
 rm -rf gui/build/$ARCH $OUT; mkdir -p gui/build
+DATA="$PWD/gui/build/$ARCH/data"
+$PY gui/bundle_data.py "$DATA"
 $RUN $PY -m PyInstaller --noconfirm --windowed --name "$NAME" \
   --distpath $OUT --workpath gui/build/$ARCH --specpath gui/build/$ARCH \
   --osx-bundle-identifier com.rddmwmddr.androidadcleaner \
   --icon "$PWD/gui/icon.icns" \
-  --add-data "$PWD/tool:tool" --add-data "$PWD/recipes:recipes" \
-  --add-data "$PWD/images:images" --add-data "$PWD/gui/web:gui/web" \
+  --add-data "$DATA/tool:tool" --add-data "$DATA/recipes:recipes" \
+  --add-data "$DATA/images:images" --add-data "$DATA/gui/web:gui/web" \
   --collect-all uiautomator2 --collect-all adbutils \
   --hidden-import uiautomator2 --hidden-import adbutils --hidden-import PIL \
   gui/app.py >/dev/null 2>gui/build/pyinstaller-$ARCH.log

@@ -88,11 +88,28 @@ MSA = "com.miui.systemAdSolution"
 
 
 def msa_net(serial, enable):
-    """小米 msa：只挂起拦不住，系统 App 启动时会把它拉起来拉广告（Issue #1）。再禁止它联网。"""
-    sh(serial, f"cmd connectivity set-package-networking-enabled {'true' if enable else 'false'} {MSA}")
+    """仅用本系统确实提供的接口；Android 13 等旧系统不伪报断网成功。"""
+    help_text = sh_all(serial, "cmd connectivity help")
+    required = ["set-package-networking-enabled", "get-package-networking-enabled"]
     if not enable:
-        sh(serial, "cmd connectivity set-chain3-enabled true")
-    return sh(serial, f"cmd connectivity get-package-networking-enabled {MSA}")
+        required += ["set-chain3-enabled", "get-chain3-enabled"]
+    if not all(re.search(r"(?m)^\s*" + re.escape(command) + r"(?:\s|$)", help_text) for command in required):
+        return {"ok": False, "supported": False, "reason": "本系统不支持 msa 断网接口；仅挂起仍可能出现广告"}
+    commands = [f"cmd connectivity set-package-networking-enabled {'true' if enable else 'false'} {MSA}"]
+    if not enable:
+        commands.append("cmd connectivity set-chain3-enabled true")
+    for command in commands:
+        result = sh_all(serial, command)
+        if re.search(r"unknown command|exception|permission denial|error|not supported|denied", result, re.I):
+            return {"ok": False, "supported": True, "reason": "系统拒绝更改 msa 网络状态：" + result[-180:]}
+    result = sh_all(serial, f"cmd connectivity get-package-networking-enabled {MSA}").strip().lower()
+    # HyperOS 实机返回「包名:allow/deny」，部分接口返回布尔值；不接受错误信息中的碰巧匹配。
+    expected = {"true", f"{MSA}:allow".lower()} if enable else {"false", f"{MSA}:deny".lower()}
+    ok = result in expected
+    if ok and not enable:
+        chain = sh_all(serial, "cmd connectivity get-chain3-enabled").strip().lower()
+        ok = chain in {"chain:enabled", "true"}
+    return {"ok": ok, "supported": True, "reason": "" if ok else "msa 网络状态回读未确认成功"}
 
 
 def prop(serial, k):
@@ -396,7 +413,10 @@ def main():
                     extra = ""
                     if p == MSA:
                         sh(s, f"am force-stop {p}")
-                        extra = "，已禁止联网" if "false" in msa_net(s, False).lower() else "，禁止联网没成功"
+                        network = msa_net(s, False)
+                        extra = "，已禁止联网" if network["ok"] else "；部分完成：" + network["reason"]
+                        if not network["ok"]:
+                            fail += 1
                     print(f"  {p}：已挂起{extra}")
                 else:
                     fail += 1
@@ -409,11 +429,22 @@ def main():
         if not pk:
             f = os.path.join(latest_backup(s), "suspended.txt")
             pk = sorted(set(open(f, encoding="utf-8").read().split())) if os.path.exists(f) else []
+        failures = 0
         for p in pk:
             sh(s, f"pm unsuspend --user 0 {p}")
+            extra = ""
             if p == MSA:
-                msa_net(s, True)
-            print(p, "已挂起" if suspended(s, p) else "已恢复")
+                network = msa_net(s, True)
+                if network["supported"] and not network["ok"]:
+                    failures += 1
+                    extra = "；联网还原失败：" + network["reason"]
+                elif not network["supported"]:
+                    extra = "；本机无 msa 断网接口，未更改联网设置"
+            still = suspended(s, p)
+            failures += still
+            print(p, ("解除挂起失败" if still else "已恢复挂起状态") + extra)
+        if failures:
+            sys.exit(1)
 
     elif cmd == "quickapp":
         sub = rest[0] if rest else "check"

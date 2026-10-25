@@ -9,7 +9,7 @@ import json, os, platform, re, runpy, shutil, subprocess, sys, threading, time, 
 from pathlib import Path
 
 APP_NAME = "安卓去广告"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 FROZEN = getattr(sys, "frozen", False)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOOL = os.path.join(BASE, "tool")
@@ -106,7 +106,7 @@ NOWIN = 0x08000000 if IS_WIN else 0     # Windows：子进程不弹黑色控制�
 
 
 # 营销渠道里混进来的服务类渠道：默认不勾
-SERVICE = re.compile(r"TETHERING|热点|ENVELOPE|红包|Auto lock|盗窃|hotspot|drive_mode|驾驶|securitypermission|权限建议|直播|ig_live|youtube\t2\t", re.I)
+SERVICE = re.compile(r"TETHERING|热点|ENVELOPE|红包|Auto lock|盗窃|hotspot|drive_mode|驾驶|securitypermission|权限建议|直播|ig_live|youtube\t2\t|警告|告警|实时活动|赛事|护眼|清理加速|普通通知|推送通知|个性化提示|\t其他$", re.I)
 
 
 class Api:
