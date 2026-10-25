@@ -115,7 +115,8 @@ FAMILY = {"oppo": "oppo", "oneplus": "oppo", "realme": "oppo", "honor": "honor",
 
 
 def recipe_meta(path):
-    src = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
     m = re.search(r'^BUILD\s*=\s*"([^"]*)"', src, re.M)
     models = re.search(r'^MODELS\s*=\s*\[([^\]]*)\]', src, re.M)
     return {"build": m.group(1) if m else "", "steps": re.findall(r'^@step\("([^"]+)"\)', src, re.M),
@@ -288,8 +289,13 @@ def main():
         if ref or not build_ok(i, recipe_meta(r)["build"]):
             os.environ["AAC_REF"] = "1"                 # 安全模式：fast.py 不做整页全关
             print("⚠ 安全模式：这份机型脚本不是按这台的型号和系统版本录的。只关脚本里点名的开关，找不到入口的步骤跳过。")
-        sh(s, "settings put global stay_on_while_plugged_in 7")
-        sys.exit(py("fast.py", "-s", s, "run", r, *rest))
+        stay_on = sh(s, "settings get global stay_on_while_plugged_in")
+        try:
+            sh(s, "settings put global stay_on_while_plugged_in 7")
+            rc = py("fast.py", "-s", s, "run", r, *rest)
+        finally:
+            sh(s, f"settings put global stay_on_while_plugged_in {stay_on if stay_on in ('0', '1', '2', '3', '4', '5', '6', '7') else '0'}")
+        sys.exit(rc)
 
     elif cmd == "chan-scan":
         d = latest_backup(s)

@@ -1,6 +1,6 @@
 # vivo / OriginOS 手动清单
 
-实测机型：vivo X300 Ultra（V2547DA，OriginOS 6，Android 16），2026-10-22。iQOO 结构相近。机型脚本：`recipes/vivo-V2547DA/`（V2547A 也用它，版本不同时走安全模式）。
+路径实测机型：vivo X300 Ultra（V2547DA，OriginOS 6，Android 16），2026-10-22。iQOO 结构相近。当前源码新增机型脚本 `recipes/vivo-V2547DA/`，整段自动执行仍待真机验证；V2547A 也会匹配它，版本不同时走安全模式，不代表 OriginOS 7 已适配。发布与验证范围见[更新记录](../../CHANGELOG.md)。
 符号：🔴 关掉　🟢 保留　⚠️ 注意
 
 ---
@@ -73,7 +73,7 @@
 vivo 推送分类的渠道：`VPushChannel_0`（运营消息）、`VPushChannel_4`（精彩消息）、`VPushChannel_6`（推荐消息）。
 
 - 🔴 支付宝运营、精彩；抖音运营、推荐；云服务推送；使用技巧智能推送建议；Play 特惠；Edge 热门资讯、突发新闻
-- ⚠️ 渠道直达参数在 vivo 上无效，打开的是 App 通知总页，要在总页里按渠道名点进去。客户端和 `chan-off` 0.2.1 起会自动这样做（Issue #7）。
+- ⚠️ 渠道直达参数在 vivo 上无效，打开的是 App 通知总页，要在总页里按渠道名点进去。当前源码的客户端和 `chan-off` 会尝试这样做（Issue #7），0.2.0 安装包尚未包含该处理。
 - ⚠️ 渠道页由 `com.vivo.systemuiplugin` 处理，不要强行停止它。
 
 ## 10. 广告包和快应用
