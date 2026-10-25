@@ -128,7 +128,7 @@ class ErrorTests(unittest.TestCase):
         self.api._run.assert_not_called()
 
     def test_failed_task_keeps_first_exception_not_only_tail(self):
-        detail = "java.lang.IllegalStateException: first cause\n" + "at frame\n" * 100
+        detail = "java.lang.IllegalStateException: first cause\n" + f"at {Path.home()}/frame\n" * 100
         self.api.job = {"running": True, "cancel": False, "lines": [], "results": [], "serial": "test", "t0": 0}
         process = Mock(stdout=io.StringIO(detail))
         process.wait.return_value = 1
@@ -137,6 +137,7 @@ class ErrorTests(unittest.TestCase):
         self.assertFalse(self.api.job["running"])
         self.assertEqual(self.api.job["results"][0]["rc"], 1)
         self.assertIn("first cause", self.api.last_error["detail"])
+        self.assertNotIn(str(Path.home()), self.api.diagnostics())
 
     def test_packaged_cli_handles_exception_with_nonzero_exit(self):
         with patch.object(self.app, "_fix_stdio"), \

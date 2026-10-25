@@ -404,7 +404,9 @@ class Api:
         if self.last_error:
             detail = self.last_error["detail"].replace("```", "~~~")
             lines.append(f"\n<details><summary>最近失败的完整诊断：{self.last_error['operation']}</summary>\n\n```text\n{detail}\n```\n</details>")
-        return "\n".join(lines)
+        report = "\n".join(lines)
+        home = os.path.expanduser("~")
+        return report.replace(home, "<用户目录>").replace(home.replace("\\", "\\\\"), "<用户目录>")
 
     def copy_text(self, text):
         try:
