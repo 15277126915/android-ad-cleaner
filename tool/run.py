@@ -158,6 +158,18 @@ def latest_backup(serial, create=False):
     return d
 
 
+def display_backup_path(path):
+    """Windows 程序和备份可能位于不同盘符，此时不能计算相对路径。"""
+    path = os.fspath(path)
+    home = os.path.expanduser("~")
+    if os.environ.get("AAC_BACKUPS"):
+        return "~" + path[len(home):] if path.startswith(home + os.sep) else path
+    try:
+        return os.path.relpath(path, ROOT)
+    except ValueError:
+        return path
+
+
 def suspended(serial, pkg):
     out = sh(serial, f"dumpsys package {pkg} | grep -m1 -o 'suspended=[a-z]*'")
     return out.endswith("true")
@@ -330,7 +342,7 @@ def main():
         st = "\n".join(f"## {n}\n" + sh(s, f"settings list {n}") for n in ("system", "secure", "global"))
         Path(d, "settings-before.txt").write_text(st, encoding="utf-8")
         Path(d, "stay_on.txt").write_text(sh(s, "settings get global stay_on_while_plugged_in"), encoding="utf-8")
-        print(f"快照已存：{d.replace(os.path.expanduser('~'), '~') if os.environ.get('AAC_BACKUPS') else os.path.relpath(d, ROOT)}")
+        print(f"快照已存：{display_backup_path(d)}")
 
     elif cmd == "recipe":
         i = info(s); r, ref = recipe_for(i["model"], i["brand"])
@@ -363,7 +375,7 @@ def main():
         f = os.path.join(d, "channels.tsv")
         Path(f).write_text(
             "# 包名\t渠道id\t渠道名。人工核对：删掉服务类（热点共享、红包、防盗、直播提醒等）后再 chan-off\n" + out, encoding="utf-8")
-        print(out); print(f"候选清单：{os.path.relpath(f, ROOT)}（共 {out.count(chr(10))} 条）")
+        print(out); print(f"候选清单：{display_backup_path(f)}（共 {out.count(chr(10))} 条）")
 
     elif cmd in ("chan-off", "chan-on"):
         if not rest:

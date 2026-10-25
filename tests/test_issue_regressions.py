@@ -3,6 +3,8 @@ import contextlib
 import importlib.util
 import io
 import json
+import ntpath
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -245,6 +247,12 @@ class QuickappTests(unittest.TestCase):
 
 
 class BackupTests(unittest.TestCase):
+    def test_backup_path_on_another_windows_drive(self):
+        with patch.object(run, "ROOT", r"D:\app"), \
+             patch.object(run.os.path, "relpath", side_effect=ntpath.relpath), \
+             patch.dict(os.environ, {"AAC_BACKUPS": ""}):
+            self.assertEqual(run.display_backup_path(r"C:\backup\channels.tsv"), r"C:\backup\channels.tsv")
+
     def test_scan_failure_preserves_existing_channel_list(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory, "channels.tsv")
