@@ -217,9 +217,35 @@ class CheckReportTests(unittest.TestCase):
         self.assertIn("部分完成", out.getvalue())
         self.assertIn("不能把部分完成当成适配成功", out.getvalue())
 
+    def run_check_entry(self, draft_path, switch_lists):
+        """走 check 的真实入口（adapt.py:360 sys.exit(main(...))），拿进程退出码。"""
+        p = draft_phone(switch_lists)
+        with patch.object(adapt, "Phone") as P, patch.dict(os.environ), \
+                contextlib.redirect_stdout(io.StringIO()):
+            P.return_value.__enter__.return_value = p
+            with self.assertRaises(SystemExit) as result:
+                sys.exit(adapt.main(["check", "-s", "FAKE_SERIAL", str(draft_path)]))
+        return result.exception.code
+
+    def test_all_closed_check_exits_zero(self):
+        with tempfile.TemporaryDirectory() as d:
+            code = self.run_check_entry(self.draft(d), [
+                [("个性化推荐", True, (1, 2))], [("个性化推荐", False, (1, 2))],
+                [("个性化推荐", True, (1, 2))], [("个性化推荐", False, (1, 2))],
+            ])
+        self.assertEqual(code, 0)
+
+    def test_partial_completion_check_exits_one(self):
+        with tempfile.TemporaryDirectory() as d:
+            code = self.run_check_entry(self.draft(d), [
+                [("个性化推荐", True, (1, 2))], [("个性化推荐", False, (1, 2))],
+                [("个性化推荐", True, (1, 2))], [("个性化推荐", True, (1, 2))],
+            ])
+        self.assertEqual(code, 1)      # 部分完成不是成功：退出码必须非 0，不能被当成自检通过
+
 
 class ExploreNavigationTests(unittest.TestCase):
-    def entry_phone(self, focus_seq, tap_seq):
+    def entry_phone(self, focus_seq, tap_seq, names=("隐私", "通知", "电池")):
         p = Mock()
         p.W, p.H = 1168, 1712
         p.switches.return_value = []
@@ -231,7 +257,6 @@ class ExploreNavigationTests(unittest.TestCase):
         def node(text):
             return ET.fromstring(f'<node text="{text}" package="com.example" bounds="[60,300][600,360]"/>')
 
-        names = ["隐私", "通知", "电池"]
         p.texts.return_value = [(n, (60, 300, 600, 360), node(n)) for n in names]
         return p
 
@@ -270,6 +295,32 @@ class ExploreNavigationTests(unittest.TestCase):
             self.assertIn(entry, tapped)
         self.assertEqual(p.start.call_count, 2)
         self.assertEqual(p.back.call_count, 3)                      # 只有第一次回不去时按了返回
+        p.d.app_stop.assert_called_once_with("com.example")
+
+    def test_recovery_is_capped_at_two_per_package(self):
+        """重进设置页每次都成功、但焦点始终回不去：同一个 App 最多恢复 2 次，然后明确中断。
+        注意 back_to 失败时连报错文案里的 focus 一共消费 5 次（explore.py:71），
+        所以每个「卡住段」给 5 个非 home 的焦点值，恢复落点单独给一个设置首页值。"""
+        focus_seq = (["com.example/.Settings"]
+                     + ["com.example/.Sub1"] * 5 + ["com.example/.Settings2"]
+                     + ["com.example/.Sub2"] * 5 + ["com.example/.Settings3"]
+                     + ["com.example/.Sub3"] * 5 + ["com.example/.Settings4"]
+                     + ["com.example/.Sub4"] * 5 + ["com.example/.Settings5"]
+                     + ["com.example/.Sub5"] * 5 + ["com.example/.Settings6"])
+        p = self.entry_phone(focus_seq, [True] * 20,
+                             names=["隐私", "通知", "电池", "声音", "显示"])
+        out = io.StringIO()
+        with patch.object(explore, "open_settings", wraps=explore.open_settings) as reopen:
+            with contextlib.redirect_stdout(out):
+                explore.explore(p, "com.example", [])
+        self.assertIn("探路到此为止", out.getvalue())                # 连踩 3 次恢复后中断本 App
+        self.assertEqual(reopen.call_count, 4)                      # 首次 + 3 次恢复，之后不再重进
+        self.assertEqual(p.start.call_count, 4)                     # 重启次数有界
+        tapped = [c.args[0] for c in p.tap.call_args_list]
+        for entry in ("隐私", "通知", "电池"):
+            self.assertIn(entry, tapped)                            # 前 3 个条目都探过
+        for entry in ("声音", "显示"):
+            self.assertNotIn(entry, tapped)                         # 中断后不再探剩下的条目
         p.d.app_stop.assert_called_once_with("com.example")
 
 
