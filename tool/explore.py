@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """新品牌自动探路：挨个打开系统 App → 我的 → 设置 → 每个子页，列出像广告/推荐的开关。只读，不拨开关。
   explore.py -s SERIAL [包名 …]        不给包名=自动挑系统里带界面的厂商 App
-输出：探路-<型号>.tsv（包名、页面路径、开关、当前状态），给人挑完写进 recipe.py。
+输出：探路-<型号>.tsv（包名、页面路径、开关、当前状态、像广告、人工勾选）。
+人工在末列写「关」挑出要关的开关，再交给 run.py adapt gen 生成 recipe 草稿；工具不自动决定关哪些。
 遇到「同意」协议页直接跳过；只点「以后再说/取消/禁止」这类拒绝按钮。
+进了子页回不去时：有界重试返回 → 重进设置页恢复 → 仍失败就明确中断本 App，不死循环。
 """
 import re, sys, time, os
 for _st in (sys.stdout, sys.stderr):
@@ -41,7 +43,7 @@ def read_page(p, path, rows, pkg):
         for t, c, _ in p.switches():
             if t and t not in seen:
                 seen.add(t)
-                rows.append((pkg, " > ".join(path), t, "开" if c else "关", "★" if AD.search(t) else ""))
+                rows.append((pkg, " > ".join(path), t, "开" if c else "关", "★" if AD.search(t) else "", ""))
         if not p.scroll_more():
             break
     p.top(6)
@@ -60,16 +62,25 @@ def open_settings(p, pkg, rows=None):
     return None
 
 
+def back_to(p, home, tries=3):
+    """从子页按返回，直到回到设置首页。回得去返回 None；回不去返回失败原因（有界，不会死循环）。"""
+    for _ in range(tries):
+        if p.focus() == home:
+            return None
+        p.back()
+    return None if p.focus() == home else f"返回 {tries} 次后仍停在 {p.focus() or '未知页面'}，不在设置首页"
+
+
 def explore(p, pkg, rows):
     print(f"\n### {pkg}")
     err = open_settings(p, pkg)
     if err:
-        print("  " + err); rows.append((pkg, "", f"（{err}）", "", "")); return
+        print("  " + err); rows.append((pkg, "", f"（{err}）", "", "", "")); return
     home = p.focus()
     p.pkg_now = home.split("/")[0]
     read_page(p, ["设置"], rows, pkg)
     todo = entries(p)[:25]
-    done = set()
+    done, recoveries = set(), 0
     for e in todo:
         if e in done:
             continue
@@ -77,12 +88,17 @@ def explore(p, pkg, rows):
         if not p.tap(e, exact=True, scrolls=4):
             continue
         read_page(p, ["设置", e], rows, pkg)
-        p.back()
-        if p.focus() != home:
-            p.back()
-        if p.focus() != home:                     # 还回不去：重新进设置页，接着探下一个
-            if open_settings(p, pkg):
-                print(f"  （从「{e}」回不到设置页，停）"); break
+        reason = back_to(p, home)
+        if reason:
+            # 回不去：重进设置页恢复，接着探下一个；同一个 App 最多恢复 2 次，然后明确中断
+            recoveries += 1
+            err = open_settings(p, pkg)
+            now = p.focus()
+            if err or recoveries > 2 or now.split("/", 1)[0] != pkg:
+                print(f"  （从「{e}」{reason}；重进设置页"
+                      f"{'失败：' + err if err else '后页面也不对'}，本 App 探路到此为止，换下一个 App）")
+                break
+            home = now                      # 重进后落点可能和首次不同：以实际页面为准
     p.d.app_stop(pkg)
 
 
@@ -103,13 +119,15 @@ def main():
             print(f"  ✗ {e}")
     fn = f"探路-{model}.tsv"
     with open(fn, "w", encoding="utf-8") as f:
-        f.write("包名\t页面\t开关\t状态\t像广告\n")
+        f.write("包名\t页面\t开关\t状态\t像广告\t人工勾选\n")
+        f.write("# 在末列写「关」挑出要关的开关，再跑：python3 tool/run.py adapt gen " + fn + "\n")
         for r in rows:
             f.write("\t".join(r) + "\n")
     star = [r for r in rows if r[4] and r[3] == "开"]
     print(f"\n探了 {len(pkgs)} 个 App，{time.time()-t0:.0f} 秒；开着的疑似广告开关 {len(star)} 个 → {fn}")
     for r in star:
         print(f"  {r[0]}  {r[1]}  「{r[2]}」")
+    print(f"在 {fn} 末列「人工勾选」写「关」挑出要关的开关，再跑：python3 tool/run.py adapt gen {fn}")
 
 
 if __name__ == "__main__":
